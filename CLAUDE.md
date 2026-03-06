@@ -7,18 +7,86 @@
 - Testy: `npx expo start --tunnel` → Expo Go na telefonie
 - PWA (`/Users/maciejgierlik/Documents/Aplikacje/sila/index.html`) działa niezależnie
 
+## Git — kontrola wersji
+
+Projekt ma git (`/Users/maciejgierlik/Documents/Aplikacje/Pulse`).
+Commity **tylko na wyraźne polecenie użytkownika** — np. "zapisz", "zrób commit".
+
+```bash
+cd /Users/maciejgierlik/Documents/Aplikacje/Pulse
+git add -A
+git commit -m "Opis zmiany"
+```
+
+Żeby wrócić do ostatniego commita (odrzucić wszystkie niezapisane zmiany):
+```bash
+git checkout .
+```
+
 ---
 
-## Opis projektu
+## Wizja produktu
 
-**Siła Native** — przepisanie PWA na React Native (Expo).
+**Pulse** — Strava + RPG + siłownia. Trening jako gra społeczna: każdy kg na sztandze to XP dla postaci, każdy trening to post na feedzie znajomych.
+
 Cel: natywna aplikacja iOS (+ Android) dostępna w App Store.
 
 - Expo SDK 54
-- Nawigacja: React Navigation v7 (bottom tabs)
-- Dane: AsyncStorage (odpowiednik localStorage z PWA)
+- Nawigacja: React Navigation v7
+- Dane: AsyncStorage → docelowo baza danych w chmurze
 - Język UI: polski
-- Design: "Obsidian Glass" — ciemne tło `#080808`, akcent `#818cf8`
+- Design: "Obsidian Glass" — ciemne tło `#0A0A0C`
+
+---
+
+## Docelowa nawigacja (Bottom Tab Bar)
+
+```
+[ Feed ] [ Discover ] [ + Log ] [ Ranks ] [ Profil ]
+```
+
+Centralny przycisk **+ Log** — zawsze dostępny, jeden tap do dodania treningu.
+
+| Tab | Opis |
+|---|---|
+| **Feed** | Aktywności znajomych — treningi, PR-y, check-iny, achievementy |
+| **Discover** | Wyszukiwanie ludzi i siłowni; mapa siłowni w okolicy |
+| **+ Log** | Nowy trening → check-in → logowanie serii → podsumowanie + publikacja |
+| **Ranks** | Rankingi: wolumen, streak, siła (IPF), XP, PR score — znajomi / siłownia / miasto / global |
+| **Profil** | Stats, rekordy, miejsca, achievementy, posty |
+
+---
+
+## System RPG
+
+- **XP** za każdy trening, bonus za PR, mnożnik za streak tygodniowy
+- **Klasy postaci**: Powerlifter (siła max), Bodybuilder (wolumen), Athlete (balans), Warrior (funkcjonalny)
+- **Statystyki postaci**: Strength, Endurance, Consistency, Power
+- **Achievementy**: First Blood, Century Club, Iron Streak, Volume Monster, Giant Killer itp.
+
+---
+
+## Model biznesowy
+
+Ćwiczący — **darmowo**. Przychód z siłowni i trenerów:
+
+| Warstwa | Płaci | Dostaje |
+|---|---|---|
+| Siłownia | Abonament (Basic/Pro) | Profil, check-iny, grafik zajęć, statystyki, promocja |
+| Trener | Prowizja / abonament | Profil, kalendarz, rezerwacje, opinie |
+| Ćwiczący | Nic | Tracking, RPG, social feed |
+
+---
+
+## Mapa rozwoju (Fazy)
+
+| Faza | Elementy | Status |
+|---|---|---|
+| **1 – Fundament** | Śledzenie treningów, progres, wykresy, RPG/postać, profil publiczny | Częściowo gotowe |
+| **2 – Social** | Znajomi, feed, hype/komentarze, udostępnianie, check-in | Do zbudowania |
+| **3 – Rywalizacja** | Leaderboardy, wyzwania 1v1, guildy, rankingi sezonowe | Do zbudowania |
+| **4 – B2B** | Profile siłowni i trenerów, rezerwacje, zajęcia grupowe, dashboard | Do zbudowania |
+| **5 – Platforma** | AI Coach, monetyzacja, video, integracje zewnętrzne | Przyszłość |
 
 ---
 
@@ -104,32 +172,29 @@ const C = {
 
 ---
 
-## TODO — kolejne ekrany
+## TODO — najbliższe kroki (Faza 1)
 
-### HistoryScreen — Historia rekordów
-- [ ] Tabela wszystkich serii posortowana po dacie malejąco
-- [ ] Filtr po ćwiczeniu (dropdown)
-- [ ] Filtr po zakresie dat
-- [ ] Możliwość usunięcia wpisu (tap w wiersz → expand → usuń)
-- [ ] Widok "Top Serie" — najlepsze serie per ćwiczenie (1 wiersz na ćwiczenie)
+### Profil użytkownika
+- [ ] Waga ciała — edytowalny input + historia pomiarów
+- [ ] Statystyki: treningi, wolumen, PR w tym roku
+- [ ] Zakładka REKORDY — tabela PR z datami, wykres progresu per ćwiczenie
+- [ ] Zakładka STATS — wykresy wolumenu tygodniowego/miesięcznego
+- [ ] Poziom RPG i klasa postaci (pasek XP)
+
+### System RPG (podstawy)
+- [ ] Obliczanie XP za trening
+- [ ] Pasek XP i poziom na profilu
+- [ ] Achievementy (pierwsze 5)
+
+### Ćwiczenia
+- [ ] Lista alfabetyczna z wyszukiwarką
+- [ ] Dodawanie / usuwanie ćwiczenia
+- [ ] Oznaczanie jako BW (masa ciała)
+
+### Historia
 - [ ] Wykres 1RM w czasie dla wybranego ćwiczenia
 
-### ExercisesScreen — Lista ćwiczeń
-- [ ] Lista wszystkich ćwiczeń alfabetycznie
-- [ ] Dodawanie nowego ćwiczenia
-- [ ] Usuwanie ćwiczenia
-- [ ] Oznaczanie ćwiczenia jako BW (masa ciała)
-
-### ProfileScreen — Profil
-- [ ] Aktualna waga ciała (edytowalny input)
-- [ ] Historia pomiarów wagi (lista lub wykres)
-- [ ] Eksport / import danych (JSON)
-
-### PlanScreen — Plan treningu
-- [ ] (Do ustalenia z użytkownikiem)
-
 ### App-wide
-- [ ] Ikony w tab barze (Ionicons lub MaterialIcons przez @expo/vector-icons)
 - [ ] Ekran ładowania / splash screen
 - [ ] Obsługa pustego stanu (brak rekordów)
 

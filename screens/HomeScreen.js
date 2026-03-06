@@ -84,7 +84,6 @@ export default function HomeScreen({ navigation }) {
       loop2Ref.current.start();
     }, 700);
 
-    // Spokojny rytm serca (~60 bpm): lub·DUB + pauza, w pętli
     heartAnim.setValue(1);
     heartbeatRef.current = Animated.loop(
       Animated.sequence([
@@ -92,7 +91,7 @@ export default function HomeScreen({ navigation }) {
         Animated.timing(heartAnim, { toValue: 0.99, duration: 140, useNativeDriver: true }),
         Animated.timing(heartAnim, { toValue: 1.09, duration: 110, useNativeDriver: true }),
         Animated.timing(heartAnim, { toValue: 1.00, duration: 180, useNativeDriver: true }),
-        Animated.timing(heartAnim, { toValue: 1.00, duration: 560, useNativeDriver: true }), // pauza
+        Animated.timing(heartAnim, { toValue: 1.00, duration: 560, useNativeDriver: true }),
       ])
     );
     heartbeatRef.current.start();
@@ -106,7 +105,6 @@ export default function HomeScreen({ navigation }) {
     heartAnim.setValue(1);
   }
 
-  // Bardzo delikatne pulsowanie gdy menu otwarte (2× subtelniejsze niż IDLE)
   function startOpenHeartbeat() {
     heartAnim.setValue(1);
     heartbeatRef.current = Animated.loop(
@@ -121,7 +119,6 @@ export default function HomeScreen({ navigation }) {
     heartbeatRef.current.start();
   }
 
-  // Reset everything on focus
   useFocusEffect(
     useCallback(() => {
       clearAll();
@@ -145,16 +142,13 @@ export default function HomeScreen({ navigation }) {
       stopPulse();
       startOpenHeartbeat();
 
-      // Ripple
       setShowRipple(true);
       rippleAnim.setValue(0);
       Animated.timing(rippleAnim, { toValue: 1, duration: 600, useNativeDriver: true })
         .start(() => setShowRipple(false));
 
-      // Rotate +45°
       Animated.spring(rotateAnim, { toValue: 1, tension: 45, friction: 10, useNativeDriver: true }).start();
 
-      // Fan items out — wolniejszy stagger
       Animated.stagger(70,
         itemAnims.map(a => Animated.spring(a, { toValue: 1, tension: 40, friction: 11, useNativeDriver: true }))
       ).start();
@@ -162,10 +156,8 @@ export default function HomeScreen({ navigation }) {
     } else if (phase === P.OPEN) {
       setPhase(P.IDLE);
 
-      // Rotate back
       Animated.spring(rotateAnim, { toValue: 0, tension: 45, friction: 10, useNativeDriver: true }).start();
 
-      // Collapse items
       Animated.stagger(45,
         [...itemAnims].reverse().map(a =>
           Animated.spring(a, { toValue: 0, tension: 60, friction: 13, useNativeDriver: true })
@@ -181,20 +173,16 @@ export default function HomeScreen({ navigation }) {
     setActive(itemId);
     setPhase(P.HEARTBEAT);
 
-    // Płynne zwijanie ikon menu
     Animated.stagger(40,
       [...itemAnims].reverse().map(a =>
         Animated.spring(a, { toValue: 0, tension: 50, friction: 13, useNativeDriver: true })
       )
     ).start();
 
-    // Rotate back to +
     Animated.spring(rotateAnim, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
 
-    // Zatrzymaj delikatne pulsowanie przed lub·DUB
     heartbeatRef.current?.stop();
 
-    // lub·DUB — powolne, dostojne (850ms)
     heartAnim.setValue(1);
     Animated.sequence([
       Animated.timing(heartAnim, { toValue: 1.20, duration: 120, useNativeDriver: true }),
@@ -205,7 +193,6 @@ export default function HomeScreen({ navigation }) {
       Animated.timing(heartAnim, { toValue: 1.00, duration: 200, useNativeDriver: true }),
     ]).start();
 
-    // T+850ms → środek zapada się do zera
     after(() => {
       setPhase(P.EXPANDING);
       Animated.timing(heartAnim, {
@@ -215,7 +202,6 @@ export default function HomeScreen({ navigation }) {
       }).start();
     }, 850);
 
-    // T+1350ms → hero pojawia się w centrum (timing: gwarantowane 1.0 po 450ms)
     after(() => {
       setPhase(P.CENTER);
       heroAnim.setValue(0);
@@ -227,7 +213,6 @@ export default function HomeScreen({ navigation }) {
       }).start();
     }, 1350);
 
-    // T+1850ms → hero wędruje w górę (timing: gwarantowane 1.0 po 950ms)
     after(() => {
       Animated.timing(heroMoveAnim, {
         toValue: 1, duration: 950,
@@ -236,7 +221,6 @@ export default function HomeScreen({ navigation }) {
       }).start();
     }, 1850);
 
-    // T+3000ms → nawigacja (heroMoveAnim kończy się w T+2800ms — 200ms zapasu)
     after(() => {
       navigation.navigate(item.screen);
     }, 3000);
@@ -253,13 +237,9 @@ export default function HomeScreen({ navigation }) {
   const rippleScale   = rippleAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 2] });
   const rippleOpacity = rippleAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0] });
 
-  // Dopasowanie pozycji hero do ScreenHeader:
-  //   środek ikony w ScreenHeader = insets.top + paddingV(14) + halfIcon(22) = insets.top + 36
-  //   środek ikony hero (przed animacją) = SH/2 − HERO_ICON_ABOVE_CENTER
-  //   HERO_ICON_ABOVE_CENTER ≈ totalContentHeight/2 − heroIconHeight/2 ≈ 52px
   const HERO_ICON_ABOVE_CENTER = 52;
-  const TARGET_SCALE = 44 / 96; // heroIcon 96px → ScreenHeader iconWrap 44px
-  const targetIconY  = insets.top + 36; // środek ikony w ScreenHeader od góry ekranu
+  const TARGET_SCALE = 44 / 96;
+  const targetIconY  = insets.top + 36;
   const heroTargetTranslateY = targetIconY + HERO_ICON_ABOVE_CENTER * TARGET_SCALE - SH / 2;
 
   const heroTranslateY = heroMoveAnim.interpolate({
@@ -268,16 +248,12 @@ export default function HomeScreen({ navigation }) {
   const heroScaleDown = heroMoveAnim.interpolate({
     inputRange: [0, 1], outputRange: [1, TARGET_SCALE],
   });
-  // Tytuł musi skalować się dodatkowo do fontSize 13 (ScreenHeader label)
-  // Kontener już skaluje o TARGET_SCALE, więc dodatkowy współczynnik = 13 / (52 × TARGET_SCALE)
   const heroLabelScale = heroMoveAnim.interpolate({
     inputRange: [0, 1], outputRange: [1, 13 / (52 * TARGET_SCALE)],
   });
-  // Korekcja pozycji labela w górę
   const heroLabelTranslateY = heroMoveAnim.interpolate({
     inputRange: [0, 1], outputRange: [0, -20],
   });
-  // Podtytuł znika podczas ruchu
   const heroSubOpacity = heroMoveAnim.interpolate({
     inputRange: [0, 0.25, 1], outputRange: [1, 0, 0],
   });
@@ -287,8 +263,8 @@ export default function HomeScreen({ navigation }) {
   const isOpen  = phase === P.OPEN;
   const isCenter = phase >= P.CENTER;
 
-  const ring1Size = CENTER_SIZE + 16;
-  const ring2Size = CENTER_SIZE + 36;
+  const ring1Size  = CENTER_SIZE + 16;
+  const ring2Size  = CENTER_SIZE + 36;
   const rippleSize = CENTER_SIZE + 60;
 
   return (
@@ -305,7 +281,7 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.tagline}>Train · Track · Share</Text>
         </Animated.View>
 
-        {/* ── Active hint ── */}
+        {/* ── Hint ── */}
         <Animated.View style={[styles.hintWrap, hiding && styles.fade]}>
           <Text style={[styles.hint, isOpen && { color: C.cyan }]}>
             {isOpen ? 'SELECT DESTINATION' : 'TAP TO NAVIGATE'}
@@ -398,7 +374,6 @@ export default function HomeScreen({ navigation }) {
                 disabled={hiding}
                 activeOpacity={0.85}
               >
-                {/* Hide + icon during heartbeat */}
                 {phase !== P.HEARTBEAT && (
                   <Feather name="plus" size={26} color="#fff" />
                 )}
@@ -433,7 +408,7 @@ export default function HomeScreen({ navigation }) {
 
       </SafeAreaView>
 
-      {/* ── Hero icon + title (centered, appears when center button vanishes) ── */}
+      {/* ── Hero icon + title ── */}
       {isCenter && sel && (
         <Animated.View
           style={[StyleSheet.absoluteFill, styles.heroWrap, {
@@ -518,15 +493,10 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.08)' },
 
   // Hero
-  heroWrap: {
-    alignItems: 'center', justifyContent: 'center',
-    zIndex: 200,
-  },
+  heroWrap: { alignItems: 'center', justifyContent: 'center', zIndex: 200 },
   heroIcon: {
-    width: 96, height: 96, borderRadius: 48,
-    borderWidth: 1.5,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 20,
+    width: 96, height: 96, borderRadius: 48, borderWidth: 1.5,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 20,
   },
   heroTitle: { fontSize: 52, fontWeight: '900', letterSpacing: 12, textTransform: 'uppercase' },
   heroSub:   { fontSize: 13, letterSpacing: 6, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', marginTop: 8 },
