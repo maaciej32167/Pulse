@@ -333,7 +333,7 @@ export default function HomeScreen({ navigation }) {
                 disabled={hiding}
                 activeOpacity={0.85}
               >
-                {phase !== P.HEARTBEAT && (
+                {phase < P.HEARTBEAT && (
                   <Feather name="plus" size={26} color="#fff" />
                 )}
               </TouchableOpacity>
