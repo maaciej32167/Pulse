@@ -90,6 +90,27 @@ Centralny przycisk **+ Log** — zawsze dostępny, jeden tap do dodania treningu
 
 ---
 
+## Must Have — Dzień 1 (MVP)
+
+```
+├── Rejestracja użytkownika
+├── Logowanie treningów
+├── Check-in z wyborem miejsca (mapa / wyszukiwarka)
+├── Automatyczne tworzenie profilu siłowni po X check-inach
+└── Licznik check-inów na profilu siłowni
+```
+
+## Można dodać później (B2B growth)
+
+```
+├── Przejęcie profilu przez siłownię (claim)
+├── Dashboard siłowni (statystyki, aktywni użytkownicy)
+├── Rezerwacje zajęć
+└── Płatne plany dla siłowni (Basic / Pro)
+```
+
+---
+
 ## Uruchomienie lokalne
 
 ```bash

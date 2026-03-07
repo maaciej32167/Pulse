@@ -6,6 +6,22 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
+import { loadRecords } from '../src/storage';
+
+function startOfDay(ts) {
+  if (!ts) return 0;
+  const d = new Date(ts);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+function fmtDuration(ms) {
+  const h = Math.round(ms / 3600000);
+  if (h < 1)  return '< 1h';
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  const rem = h % 24;
+  return rem > 0 ? `${d}d ${rem}h` : `${d}d`;
+}
 
 // ─── constants ───────────────────────────────────────────────────────────────
 
@@ -27,7 +43,7 @@ const P = { IDLE: 0, OPEN: 1, HEARTBEAT: 2, EXPANDING: 3, CENTER: 4 };
 
 const MENU = [
   { id: 'plan',     label: 'PLAN',     icon: 'calendar',    color: '#00F5FF', angle: -150, screen: 'Plan'      },
-  { id: 'workout',  label: 'TRENING',  icon: 'zap',         color: '#FF4757', angle:  -90, screen: 'Start'     },
+  { id: 'workout',  label: 'TRENING',  icon: 'zap',         color: '#FF4757', angle:  -90, screen: 'Log'       },
   { id: 'stats',    label: 'HISTORIA', icon: 'activity',    color: '#FFD700', angle:  -30, screen: 'Historia'  },
   { id: 'cwicz',    label: 'ĆWICZ.',   icon: 'bar-chart-2', color: '#00F5FF', angle:   30, screen: 'Cwiczenia' },
   { id: 'discover', label: 'DISCOVER', icon: 'compass',     color: '#818cf8', angle:   90, screen: 'Discover'  },
@@ -51,6 +67,7 @@ export default function HomeScreen({ navigation }) {
   const [phase, setPhase]   = useState(P.IDLE);
   const [active, setActive] = useState(null);
   const [showRipple, setShowRipple] = useState(false);
+  const [stats, setStats]   = useState({ duration: 0, workouts: 0, follows: 0 });
 
   const timers     = useRef([]);
   const itemAnims  = useRef(MENU.map(() => new Animated.Value(0))).current;
@@ -124,6 +141,22 @@ export default function HomeScreen({ navigation }) {
       heroAnim.setValue(0);
       heroMoveAnim.setValue(0);
       startPulse();
+
+      (async () => {
+        const rec = await loadRecords();
+        const days = new Map();
+        for (const r of rec) {
+          const day = startOfDay(r.timestamp || 0);
+          if (!days.has(day)) days.set(day, []);
+          days.get(day).push(r.timestamp || 0);
+        }
+        let totalMs = 0;
+        for (const ts of days.values()) {
+          if (ts.length > 1) totalMs += Math.max(...ts) - Math.min(...ts);
+        }
+        setStats({ duration: totalMs, workouts: days.size, follows: 0 });
+      })();
+
       return () => { stopPulse(); clearAll(); };
     }, [])
   );
@@ -349,18 +382,18 @@ export default function HomeScreen({ navigation }) {
           </Text>
           <View style={styles.statsStrip}>
             <View style={styles.stat}>
-              <Text style={styles.statValue}>147<Text style={styles.statUnit}>k</Text></Text>
-              <Text style={styles.statLabel}>CALORIES</Text>
+              <Text style={styles.statValue}>{stats.duration > 0 ? fmtDuration(stats.duration) : '—'}</Text>
+              <Text style={styles.statLabel}>DURATION</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.stat}>
-              <Text style={styles.statValue}>38</Text>
+              <Text style={styles.statValue}>{stats.workouts || '—'}</Text>
               <Text style={styles.statLabel}>WORKOUTS</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.stat}>
-              <Text style={styles.statValue}>12</Text>
-              <Text style={styles.statLabel}>FRIENDS</Text>
+              <Text style={styles.statValue}>{stats.follows || '—'}</Text>
+              <Text style={styles.statLabel}>FOLLOWS</Text>
             </View>
           </View>
         </Animated.View>
@@ -444,8 +477,8 @@ const styles = StyleSheet.create({
 
   footerWrap:  { alignItems: 'center', paddingBottom: 8 },
   instruction: { fontSize: 11, letterSpacing: 4, color: 'rgba(255,255,255,0.18)', textTransform: 'uppercase', marginBottom: 24 },
-  statsStrip:  { flexDirection: 'row', alignItems: 'center', gap: 32, marginBottom: 16 },
-  stat:        { alignItems: 'center' },
+  statsStrip:  { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', paddingHorizontal: 24, marginBottom: 16 },
+  stat:        { flex: 1, alignItems: 'center' },
   statValue:   { fontSize: 28, fontWeight: '700', letterSpacing: 1, color: '#fff', lineHeight: 32 },
   statUnit:    { fontSize: 16, color: C.cyan },
   statLabel:   { fontSize: 10, letterSpacing: 5, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', marginTop: 4 },

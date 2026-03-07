@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList, Modal, TextInput, Alert,
 } from 'react-native';
@@ -16,6 +16,12 @@ const C = {
 };
 
 // ─── helpers ──────────────────────────────────────────────────────────────
+
+function startOfDay(ts) {
+  if (!ts) return 0;
+  const d = new Date(ts);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
 
 function fmtWeight(record, bwExercises, bodyWeight) {
   if (bwExercises.has(record.exercise)) {
@@ -370,6 +376,118 @@ function TopSerieView({ records, exercises, bodyWeight, bwExercises, onDelete, o
   );
 }
 
+// ─── TreningiView ─────────────────────────────────────────────────────────
+
+function fmtDuration(ms) {
+  if (ms < 60000) return '< 1 min';
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h > 0) return `${h}h ${m}min`;
+  return `${m} min`;
+}
+
+function getPRExercises(dayRecords, allRecords, dayStart) {
+  const prs = new Set();
+  const seen = new Set();
+  for (const r of dayRecords) {
+    if (seen.has(r.exercise)) continue;
+    seen.add(r.exercise);
+    const prev = allRecords.filter(p =>
+      p.exercise === r.exercise && startOfDay(p.timestamp || 0) < dayStart
+    );
+    if (prev.length === 0) continue;
+    const bestPrev = Math.max(...prev.map(p => estimate1RM(Number(p.weight), Number(p.reps))));
+    const bestCur = Math.max(...dayRecords
+      .filter(d => d.exercise === r.exercise)
+      .map(d => estimate1RM(Number(d.weight), Number(d.reps)))
+    );
+    if (bestCur > bestPrev) prs.add(r.exercise);
+  }
+  return [...prs];
+}
+
+function TreningiView({ records, bodyWeight, bwExercises, navigation }) {
+  const days = [];
+  const map = new Map();
+  for (const r of records) {
+    const day = startOfDay(r.timestamp || 0);
+    if (!map.has(day)) { map.set(day, []); days.push(day); }
+    map.get(day).push(r);
+  }
+  days.sort((a, b) => b - a);
+
+  if (days.length === 0) {
+    return <View style={styles.empty}><Text style={styles.emptyText}>Brak treningów</Text></View>;
+  }
+
+  return (
+    <FlatList
+      data={days}
+      keyExtractor={day => String(day)}
+      contentContainerStyle={styles.list}
+      renderItem={({ item: day }) => {
+        const dayRecords = map.get(day);
+        const exercises = [...new Set(dayRecords.map(r => r.exercise))];
+        const volume = dayRecords.reduce((s, r) => s + r.weight * r.reps, 0);
+        const date = dayRecords[0]?.date || new Date(day).toLocaleDateString('pl-PL');
+        const timestamps = dayRecords.map(r => r.timestamp || 0).filter(Boolean);
+        const duration = timestamps.length > 1
+          ? Math.max(...timestamps) - Math.min(...timestamps)
+          : null;
+        const prExercises = getPRExercises(dayRecords, records, day);
+
+        return (
+          <TouchableOpacity
+            style={styles.workoutCard}
+            onPress={() => navigation.navigate('WorkoutDetail', {
+              date,
+              records: dayRecords,
+              bodyWeight,
+              bwExercises: Array.from(bwExercises),
+              allRecords: records,
+            })}
+            activeOpacity={0.75}
+          >
+            <View style={styles.workoutCardHeader}>
+              <Text style={styles.workoutDate}>{date}</Text>
+              <Feather name="chevron-right" size={16} color={C.muted} />
+            </View>
+            <View style={styles.workoutStats}>
+              <View style={styles.workoutStat}>
+                <Text style={styles.workoutStatVal}>{duration != null ? fmtDuration(duration) : '—'}</Text>
+                <Text style={styles.workoutStatLabel}>czas</Text>
+              </View>
+              <View style={styles.workoutStatDiv} />
+              <View style={styles.workoutStat}>
+                <Text style={styles.workoutStatVal}>{exercises.length}</Text>
+                <Text style={styles.workoutStatLabel}>ćwiczenia</Text>
+              </View>
+              <View style={styles.workoutStatDiv} />
+              <View style={styles.workoutStat}>
+                <Text style={styles.workoutStatVal}>{dayRecords.length}</Text>
+                <Text style={styles.workoutStatLabel}>serie</Text>
+              </View>
+              <View style={styles.workoutStatDiv} />
+              <View style={styles.workoutStat}>
+                <Text style={[styles.workoutStatVal, { color: C.accent }]}>{Math.round(volume)} kg</Text>
+                <Text style={styles.workoutStatLabel}>wolumen</Text>
+              </View>
+            </View>
+            {prExercises.length > 0 && (
+              <View style={styles.workoutPR}>
+                <Feather name="award" size={11} color="#FFD700" />
+                <Text style={styles.workoutPRText}>
+                  PR: {prExercises.slice(0, 2).join(', ')}{prExercises.length > 2 ? ` +${prExercises.length - 2}` : ''}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      }}
+    />
+  );
+}
+
 // ─── HistoryScreen ────────────────────────────────────────────────────────
 
 export default function HistoryScreen({ navigation }) {
@@ -377,7 +495,7 @@ export default function HistoryScreen({ navigation }) {
   const [exercises, setExercises] = useState([]);
   const [bodyWeight, setBodyWeight] = useState(80);
   const [bwExercises, setBwExercises] = useState(new Set());
-  const [subPage, setSubPage] = useState('lista'); // 'lista' | 'top'
+  const [subPage, setSubPage] = useState('treningi'); // 'treningi' | 'lista' | 'top'
 
   useFocusEffect(
     useCallback(() => {
@@ -415,8 +533,9 @@ export default function HistoryScreen({ navigation }) {
   }
 
   const TABS = [
-    { key: 'lista', label: 'Lista serii' },
-    { key: 'top',   label: '🏆 Top Serie' },
+    { key: 'treningi', label: 'Treningi' },
+    { key: 'lista',    label: 'Serie' },
+    { key: 'top',      label: '🏆 Top' },
   ];
 
   return (
@@ -439,6 +558,14 @@ export default function HistoryScreen({ navigation }) {
       </View>
 
       {/* Treść */}
+      {subPage === 'treningi' && (
+        <TreningiView
+          records={records}
+          bodyWeight={bodyWeight}
+          bwExercises={bwExercises}
+          navigation={navigation}
+        />
+      )}
       {subPage === 'lista' && (
         <ListaView
           records={records}
@@ -554,6 +681,25 @@ const styles = StyleSheet.create({
   topWeight: { color: C.accent, fontSize: 14, fontWeight: '700' },
   topReps: { color: C.muted, fontSize: 14 },
   topOrm: { color: C.accent2, fontSize: 11 },
+
+  // Treningi — karty
+  workoutCard: {
+    backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+    borderRadius: 12, marginBottom: 8, padding: 14,
+  },
+  workoutCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  workoutDate: { color: C.txt, fontSize: 13, fontWeight: '700' },
+  workoutStats: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  workoutStat: { flex: 1, alignItems: 'center' },
+  workoutStatDiv: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.08)' },
+  workoutStatVal: { color: C.txt, fontSize: 15, fontWeight: '800' },
+  workoutStatLabel: { color: C.muted, fontSize: 10, marginTop: 2 },
+  workoutPR: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    marginTop: 10, paddingTop: 8,
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
+  },
+  workoutPRText: { color: '#FFD700', fontSize: 11, fontWeight: '700', flex: 1 },
 
   // Modal
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },

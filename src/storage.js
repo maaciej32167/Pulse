@@ -7,6 +7,7 @@ export const KEYS = {
   bodyWeight:'sila_body_weight_kg',
   bwHistory: 'sila_body_weight_history',
   bwEx:      'sila_bw_exercises',
+  myGym:     'pulse_my_gym',
 };
 
 export const DEFAULT_EXERCISES = [
@@ -49,4 +50,13 @@ export async function loadBodyWeight() {
 export async function loadBWExercises() {
   const stored = await AsyncStorage.getItem(KEYS.bwEx);
   return stored ? new Set(JSON.parse(stored)) : new Set(DEFAULT_BW_EX);
+}
+
+export async function loadMyGym() {
+  const stored = await AsyncStorage.getItem(KEYS.myGym);
+  return stored ? JSON.parse(stored) : null;
+}
+
+export async function saveMyGym(gym) {
+  await AsyncStorage.setItem(KEYS.myGym, JSON.stringify(gym));
 }

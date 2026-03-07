@@ -11,6 +11,10 @@ import ExercisesScreen from './screens/ExercisesScreen';
 import ProfileScreen   from './screens/ProfileScreen';
 import DiscoverScreen  from './screens/DiscoverScreen';
 import GymScreen       from './screens/GymScreen';
+import LogScreen       from './screens/LogScreen';
+import WorkoutScreen   from './screens/WorkoutScreen';
+import SummaryScreen         from './screens/SummaryScreen';
+import WorkoutDetailScreen   from './screens/WorkoutDetailScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -34,6 +38,10 @@ export default function App() {
           <Stack.Screen name="Profil"    component={ProfileScreen}   />
           <Stack.Screen name="Discover"  component={DiscoverScreen}  />
           <Stack.Screen name="Gym"       component={GymScreen}       />
+          <Stack.Screen name="Log"       component={LogScreen}       />
+          <Stack.Screen name="Workout"   component={WorkoutScreen}   />
+          <Stack.Screen name="Summary"        component={SummaryScreen}       />
+          <Stack.Screen name="WorkoutDetail"  component={WorkoutDetailScreen}  />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
