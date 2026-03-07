@@ -17,7 +17,6 @@ const RADIUS     = 110 * (CONTAINER / 300);
 const ITEM_SIZE  = 56;
 const CENTER_SIZE = 68;
 const CENTER_R   = CENTER_SIZE / 2;
-const ORBIT_SIZE = 240 * (CONTAINER / 300);
 const ITEM_BASE  = HALF - ITEM_SIZE / 2;
 const CENTER_OFF = HALF - CENTER_R;
 
@@ -60,12 +59,7 @@ export default function HomeScreen({ navigation }) {
   const rippleAnim  = useRef(new Animated.Value(0)).current;
   const heroAnim    = useRef(new Animated.Value(0)).current;
   const heroMoveAnim = useRef(new Animated.Value(0)).current;
-  const pulse1     = useRef(new Animated.Value(0)).current;
-  const pulse2     = useRef(new Animated.Value(0)).current;
-  const pulse3     = useRef(new Animated.Value(0)).current;
-  const pulse4     = useRef(new Animated.Value(0)).current;
   const pulseRunning  = useRef(false);
-  const cycleIdx      = useRef(0);
   const heartbeatRef  = useRef(null);
 
   const after = (fn, ms) => {
@@ -80,41 +74,19 @@ export default function HomeScreen({ navigation }) {
 
   function startPulse() {
     pulseRunning.current = true;
-    cycleIdx.current = 0;
     heartAnim.setValue(1);
-
-    function fireWave(anim) {
-      anim.setValue(0);
-      Animated.timing(anim, { toValue: 1, duration: 4400, useNativeDriver: true }).start();
-    }
 
     function runCycle() {
       if (!pulseRunning.current) return;
       heartAnim.setValue(1);
-
-      // Wybierz parę fal (0→para A, 1→para B), poprzednia para nadal animuje
-      const idx = cycleIdx.current;
-      const b1  = idx === 0 ? pulse1 : pulse3;
-      const b2  = idx === 0 ? pulse2 : pulse4;
-      cycleIdx.current = idx === 0 ? 1 : 0;
-
-      // Uderzenie 1
-      fireWave(b1);
       Animated.sequence([
         Animated.timing(heartAnim, { toValue: 1.06, duration: 110, useNativeDriver: true }),
         Animated.timing(heartAnim, { toValue: 0.99, duration: 140, useNativeDriver: true }),
+        Animated.timing(heartAnim, { toValue: 1.09, duration: 110, useNativeDriver: true }),
+        Animated.timing(heartAnim, { toValue: 1.00, duration: 180, useNativeDriver: true }),
+        Animated.timing(heartAnim, { toValue: 1.00, duration: 560, useNativeDriver: true }),
       ]).start(({ finished }) => {
-        if (!finished || !pulseRunning.current) return;
-
-        // Uderzenie 2
-        fireWave(b2);
-        Animated.sequence([
-          Animated.timing(heartAnim, { toValue: 1.09, duration: 110, useNativeDriver: true }),
-          Animated.timing(heartAnim, { toValue: 1.00, duration: 180, useNativeDriver: true }),
-          Animated.timing(heartAnim, { toValue: 1.00, duration: 560, useNativeDriver: true }),
-        ]).start(({ finished }) => {
-          if (finished && pulseRunning.current) runCycle();
-        });
+        if (finished && pulseRunning.current) runCycle();
       });
     }
 
@@ -124,10 +96,6 @@ export default function HomeScreen({ navigation }) {
   function stopPulse() {
     pulseRunning.current = false;
     heartAnim.stopAnimation();
-    pulse1.stopAnimation();
-    pulse2.stopAnimation();
-    pulse3.stopAnimation();
-    pulse4.stopAnimation();
   }
 
   function startOpenHeartbeat() {
@@ -250,19 +218,6 @@ export default function HomeScreen({ navigation }) {
   // ── derived interpolations ──
   const rotation = rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] });
 
-  const WAVE_OUT = [1.0, 5.6];
-  const WAVE_OP1 = { inputRange: [0, 0.05, 0.6, 1], outputRange: [0, 0.375, 0.15, 0] };
-  const WAVE_OP2 = { inputRange: [0, 0.05, 0.6, 1], outputRange: [0, 0.25,  0.1, 0] };
-
-  const ring1Scale   = pulse1.interpolate({ inputRange: [0, 1], outputRange: WAVE_OUT });
-  const ring1Opacity = pulse1.interpolate(WAVE_OP1);
-  const ring2Scale   = pulse2.interpolate({ inputRange: [0, 1], outputRange: WAVE_OUT });
-  const ring2Opacity = pulse2.interpolate(WAVE_OP2);
-  const ring3Scale   = pulse3.interpolate({ inputRange: [0, 1], outputRange: WAVE_OUT });
-  const ring3Opacity = pulse3.interpolate(WAVE_OP1);
-  const ring4Scale   = pulse4.interpolate({ inputRange: [0, 1], outputRange: WAVE_OUT });
-  const ring4Opacity = pulse4.interpolate(WAVE_OP2);
-
   const rippleScale   = rippleAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 2] });
   const rippleOpacity = rippleAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0] });
 
@@ -292,7 +247,6 @@ export default function HomeScreen({ navigation }) {
   const isOpen  = phase === P.OPEN;
   const isCenter = phase >= P.CENTER;
 
-  const ringSize   = CENTER_SIZE;
   const rippleSize = CENTER_SIZE + 60;
 
   return (
@@ -320,11 +274,6 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.stage}>
           <View style={{ width: CONTAINER, height: CONTAINER }}>
 
-            {/* Orbit ring */}
-            <View style={[styles.orbitRing, {
-              left: HALF - ORBIT_SIZE / 2, top: HALF - ORBIT_SIZE / 2,
-              width: ORBIT_SIZE, height: ORBIT_SIZE, borderRadius: ORBIT_SIZE / 2,
-            }, isOpen && styles.orbitRingOpen]} />
 
             {/* Menu items */}
             {MENU.map((item, i) => {
@@ -358,30 +307,6 @@ export default function HomeScreen({ navigation }) {
               );
             })}
 
-            {phase === P.IDLE && (
-              <>
-                <Animated.View style={[styles.pulseRing, {
-                  left: CENTER_OFF, top: CENTER_OFF,
-                  width: ringSize, height: ringSize, borderRadius: ringSize / 2,
-                  transform: [{ scale: ring1Scale }], opacity: ring1Opacity,
-                }]} />
-                <Animated.View style={[styles.pulseRing, {
-                  left: CENTER_OFF, top: CENTER_OFF,
-                  width: ringSize, height: ringSize, borderRadius: ringSize / 2,
-                  transform: [{ scale: ring2Scale }], opacity: ring2Opacity,
-                }]} />
-                <Animated.View style={[styles.pulseRing, {
-                  left: CENTER_OFF, top: CENTER_OFF,
-                  width: ringSize, height: ringSize, borderRadius: ringSize / 2,
-                  transform: [{ scale: ring3Scale }], opacity: ring3Opacity,
-                }]} />
-                <Animated.View style={[styles.pulseRing, {
-                  left: CENTER_OFF, top: CENTER_OFF,
-                  width: ringSize, height: ringSize, borderRadius: ringSize / 2,
-                  transform: [{ scale: ring4Scale }], opacity: ring4Opacity,
-                }]} />
-              </>
-            )}
 
             {/* Ripple */}
             {showRipple && (
