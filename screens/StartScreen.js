@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  TextInput, Alert, Modal, FlatList,
+  Alert, Modal, FlatList,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -236,6 +236,41 @@ function TodaySection({ records, bwExercises, bodyWeight, onDelete, onEditSave }
   );
 }
 
+// ─── custom keypad ────────────────────────────────────────────────────────
+const KEYS = [
+  ['7','8','9'],
+  ['4','5','6'],
+  ['1','2','3'],
+  ['.','0','⌫'],
+];
+
+function CustomKeypad({ showDot, onKey }) {
+  return (
+    <View style={kbStyles.wrap}>
+      {KEYS.map((row, ri) => (
+        <View key={ri} style={kbStyles.row}>
+          {row.map(k => {
+            if (k === '.' && !showDot) {
+              return <View key={k} style={kbStyles.keyEmpty} />;
+            }
+            const isBack = k === '⌫';
+            return (
+              <TouchableOpacity
+                key={k}
+                style={[kbStyles.key, isBack && kbStyles.keyBack]}
+                onPress={() => onKey(k)}
+                activeOpacity={0.6}
+              >
+                <Text style={[kbStyles.keyTxt, isBack && kbStyles.keyBackTxt]}>{k}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 // ─── główny ekran ─────────────────────────────────────────────────────────
 export default function StartScreen({ navigation }) {
   const [exercises, setExercises] = useState([]);
@@ -248,6 +283,16 @@ export default function StartScreen({ navigation }) {
   const [live1RM, setLive1RM] = useState(null);
   const [toast, setToast] = useState('');
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [activeField, setActiveField] = useState(null); // 'weight' | 'reps' | null
+
+  function handleKey(k) {
+    const current = activeField === 'weight' ? weight : reps;
+    const setter  = activeField === 'weight' ? setWeight : setReps;
+    if (k === '⌫') { setter(current.slice(0, -1)); return; }
+    if (k === '.' && (current.includes('.') || activeField === 'reps')) return;
+    if (current.length >= 6) return;
+    setter(current + k);
+  }
 
   useEffect(() => {
     async function init() {
@@ -367,25 +412,27 @@ export default function StartScreen({ navigation }) {
           <View style={styles.row}>
             <View style={styles.inputWrap}>
               <Text style={styles.inputLabel}>{isBW ? 'Dodatkowe (kg)' : 'Ciężar (kg)'}</Text>
-              <TextInput
-                style={styles.input}
-                value={weight}
-                onChangeText={setWeight}
-                keyboardType="decimal-pad"
-                placeholder="0"
-                placeholderTextColor="#64748b"
-              />
+              <TouchableOpacity
+                style={[styles.input, activeField === 'weight' && styles.inputActive]}
+                onPress={() => setActiveField('weight')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.inputVal, !weight && styles.inputPlaceholder]}>
+                  {weight || '0'}
+                </Text>
+              </TouchableOpacity>
             </View>
             <View style={styles.inputWrap}>
               <Text style={styles.inputLabel}>Powtórzenia</Text>
-              <TextInput
-                style={styles.input}
-                value={reps}
-                onChangeText={setReps}
-                keyboardType="number-pad"
-                placeholder="0"
-                placeholderTextColor="#64748b"
-              />
+              <TouchableOpacity
+                style={[styles.input, activeField === 'reps' && styles.inputActive]}
+                onPress={() => setActiveField('reps')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.inputVal, !reps && styles.inputPlaceholder]}>
+                  {reps || '0'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -393,7 +440,14 @@ export default function StartScreen({ navigation }) {
             <Text style={styles.live1rm}>🧮 1RM ≈ {live1RM} kg</Text>
           )}
 
-          <TouchableOpacity style={styles.btn} onPress={addRecord}>
+          {activeField && (
+            <CustomKeypad
+              showDot={activeField === 'weight'}
+              onKey={handleKey}
+            />
+          )}
+
+          <TouchableOpacity style={styles.btn} onPress={() => { setActiveField(null); addRecord(); }}>
             <Text style={styles.btnText}>Zapisz serię</Text>
           </TouchableOpacity>
         </View>
@@ -515,8 +569,13 @@ const styles = StyleSheet.create({
   inputLabel: { color: C.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', marginBottom: 4 },
   input: {
     backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: C.border,
-    borderRadius: 10, padding: 12, color: C.txt, fontSize: 18, fontWeight: '700',
+    borderRadius: 10, padding: 12, alignItems: 'center', justifyContent: 'center',
   },
+  inputActive: {
+    borderColor: C.accent, backgroundColor: 'rgba(255,71,87,0.08)',
+  },
+  inputVal: { color: C.txt, fontSize: 22, fontWeight: '700' },
+  inputPlaceholder: { color: C.muted },
   live1rm: { color: C.accent, fontSize: 14, marginBottom: 10 },
   btn: {
     backgroundColor: C.accent, borderRadius: 12,
@@ -587,4 +646,24 @@ const styles = StyleSheet.create({
     borderRadius: 20, borderWidth: 1, borderColor: C.border,
   },
   toastText: { color: C.txt, fontSize: 14 },
+});
+
+const kbStyles = StyleSheet.create({
+  wrap: {
+    marginTop: 12,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 14, padding: 8, gap: 6,
+  },
+  row: { flexDirection: 'row', gap: 6 },
+  key: {
+    flex: 1, paddingVertical: 11,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)',
+    borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+  },
+  keyEmpty: { flex: 1 },
+  keyBack: { backgroundColor: 'rgba(255,71,87,0.1)', borderColor: 'rgba(255,71,87,0.2)' },
+  keyTxt: { color: '#f1f5f9', fontSize: 18, fontWeight: '600' },
+  keyBackTxt: { color: '#FF4757', fontSize: 18 },
 });

@@ -9,6 +9,8 @@ import HistoryScreen   from './screens/HistoryScreen';
 import PlanScreen      from './screens/PlanScreen';
 import ExercisesScreen from './screens/ExercisesScreen';
 import ProfileScreen   from './screens/ProfileScreen';
+import DiscoverScreen  from './screens/DiscoverScreen';
+import GymScreen       from './screens/GymScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -30,6 +32,8 @@ export default function App() {
           <Stack.Screen name="Plan"      component={PlanScreen}      />
           <Stack.Screen name="Cwiczenia" component={ExercisesScreen} />
           <Stack.Screen name="Profil"    component={ProfileScreen}   />
+          <Stack.Screen name="Discover"  component={DiscoverScreen}  />
+          <Stack.Screen name="Gym"       component={GymScreen}       />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

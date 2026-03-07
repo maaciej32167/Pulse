@@ -27,12 +27,18 @@ function toRad(deg) { return (deg * Math.PI) / 180; }
 const P = { IDLE: 0, OPEN: 1, HEARTBEAT: 2, EXPANDING: 3, CENTER: 4 };
 
 const MENU = [
-  { id: 'plan',    label: 'PLAN',     icon: 'calendar',    color: '#00F5FF', angle: -162, screen: 'Plan'      },
-  { id: 'workout', label: 'TRENING',  icon: 'zap',         color: '#FF4757', angle: -117, screen: 'Start'     },
-  { id: 'stats',   label: 'HISTORIA', icon: 'activity',    color: '#FFD700', angle:  -90, screen: 'Historia'  },
-  { id: 'cwicz',   label: 'ĆWICZ.',   icon: 'bar-chart-2', color: '#00F5FF', angle:  -63, screen: 'Cwiczenia' },
-  { id: 'profile', label: 'PROFIL',   icon: 'user',        color: '#FF4757', angle:  -18, screen: 'Profil'    },
+  { id: 'plan',     label: 'PLAN',     icon: 'calendar',    color: '#00F5FF', angle: -150, screen: 'Plan'      },
+  { id: 'workout',  label: 'TRENING',  icon: 'zap',         color: '#FF4757', angle:  -90, screen: 'Start'     },
+  { id: 'stats',    label: 'HISTORIA', icon: 'activity',    color: '#FFD700', angle:  -30, screen: 'Historia'  },
+  { id: 'cwicz',    label: 'ĆWICZ.',   icon: 'bar-chart-2', color: '#00F5FF', angle:   30, screen: 'Cwiczenia' },
+  { id: 'discover', label: 'DISCOVER', icon: 'compass',     color: '#818cf8', angle:   90, screen: 'Discover'  },
+  { id: 'profile',  label: 'PROFIL',   icon: 'user',        color: '#FF4757', angle:  150, screen: 'Profil'    },
 ];
+
+// Kolejność zgodna z ruchem wskazówek zegara (od 12):
+// workout(1,-90°) → stats(2,-30°) → cwicz(3,30°) → discover(4,90°) → profile(5,150°) → plan(0,-150°)
+const CW_ORDER = [1, 2, 3, 4, 5, 0];
+const CCW_ORDER = [0, 5, 4, 3, 2, 1];
 
 const C = {
   bg: '#0A0A0C', txt: '#fff', muted: 'rgba(255,255,255,0.35)',
@@ -102,7 +108,6 @@ export default function HomeScreen({ navigation }) {
     loop2Ref.current?.stop();
     clearTimeout(pulseTimer.current);
     heartbeatRef.current?.stop();
-    heartAnim.setValue(1);
   }
 
   function startOpenHeartbeat() {
@@ -149,8 +154,8 @@ export default function HomeScreen({ navigation }) {
 
       Animated.spring(rotateAnim, { toValue: 1, tension: 45, friction: 10, useNativeDriver: true }).start();
 
-      Animated.stagger(70,
-        itemAnims.map(a => Animated.spring(a, { toValue: 1, tension: 40, friction: 11, useNativeDriver: true }))
+      Animated.stagger(100,
+        CW_ORDER.map(i => Animated.spring(itemAnims[i], { toValue: 1, tension: 40, friction: 11, useNativeDriver: true }))
       ).start();
 
     } else if (phase === P.OPEN) {
@@ -158,10 +163,8 @@ export default function HomeScreen({ navigation }) {
 
       Animated.spring(rotateAnim, { toValue: 0, tension: 45, friction: 10, useNativeDriver: true }).start();
 
-      Animated.stagger(45,
-        [...itemAnims].reverse().map(a =>
-          Animated.spring(a, { toValue: 0, tension: 60, friction: 13, useNativeDriver: true })
-        )
+      Animated.stagger(100,
+        CCW_ORDER.map(i => Animated.spring(itemAnims[i], { toValue: 0, tension: 60, friction: 13, useNativeDriver: true }))
       ).start(() => startPulse());
     }
   }
@@ -173,10 +176,8 @@ export default function HomeScreen({ navigation }) {
     setActive(itemId);
     setPhase(P.HEARTBEAT);
 
-    Animated.stagger(40,
-      [...itemAnims].reverse().map(a =>
-        Animated.spring(a, { toValue: 0, tension: 50, friction: 13, useNativeDriver: true })
-      )
+    Animated.stagger(100,
+      CCW_ORDER.map(i => Animated.spring(itemAnims[i], { toValue: 0, tension: 50, friction: 13, useNativeDriver: true }))
     ).start();
 
     Animated.spring(rotateAnim, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();

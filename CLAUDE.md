@@ -83,9 +83,9 @@ Centralny przycisk **+ Log** — zawsze dostępny, jeden tap do dodania treningu
 | Faza | Elementy | Status |
 |---|---|---|
 | **1 – Fundament** | Śledzenie treningów, progres, wykresy, RPG/postać, profil publiczny | Częściowo gotowe |
-| **2 – Social** | Znajomi, feed, hype/komentarze, udostępnianie, check-in | Do zbudowania |
+| **2 – Social** | Znajomi, feed, hype/komentarze, udostępnianie, check-in | Discover UI gotowe (mock) |
 | **3 – Rywalizacja** | Leaderboardy, wyzwania 1v1, guildy, rankingi sezonowe | Do zbudowania |
-| **4 – B2B** | Profile siłowni i trenerów, rezerwacje, zajęcia grupowe, dashboard | Do zbudowania |
+| **4 – B2B** | Profile siłowni i trenerów, rezerwacje, zajęcia grupowe, dashboard | GymScreen UI gotowe (mock) |
 | **5 – Platforma** | AI Coach, monetyzacja, video, integracje zewnętrzne | Przyszłość |
 
 ---
@@ -104,13 +104,18 @@ Następnie zeskanuj QR kod w aplikacji **Expo Go** na telefonie.
 ## Struktura projektu
 
 ```
-App.js                    # Nawigacja (bottom tabs)
+App.js                    # Nawigacja (Stack)
 screens/
+  HomeScreen.js           # Ekran główny — orbita menu z animacjami ✅
   StartScreen.js          # Dodaj serię + PR ✅
   HistoryScreen.js        # Historia rekordów (do zbudowania)
   PlanScreen.js           # Planowanie treningu (do zbudowania)
   ExercisesScreen.js      # Lista ćwiczeń (do zbudowania)
   ProfileScreen.js        # Profil + waga ciała (do zbudowania)
+  DiscoverScreen.js       # Wyszukiwanie siłowni i użytkowników ✅
+  GymScreen.js            # Profil siłowni: teraz tutaj, stali bywalcy, statystyki ✅
+components/
+  ScreenHeader.js         # Wspólny nagłówek ekranu ✅
 src/
   storage.js              # AsyncStorage helpers ✅
   utils.js                # Logika biznesowa (1RM, effectiveWeight) ✅
@@ -197,6 +202,9 @@ const C = {
 ### App-wide
 - [ ] Ekran ładowania / splash screen
 - [ ] Obsługa pustego stanu (brak rekordów)
+
+### Check-in / Check-out
+- [ ] **Automatyczny check-out po zakończeniu treningu** — do rozważenia: po zapisaniu podsumowania treningu w StartScreen → auto check-out z siłowni (jeśli użytkownik był zameldowany)
 
 ---
 
