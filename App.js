@@ -2,6 +2,9 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { View, ActivityIndicator } from 'react-native';
 
 import HomeScreen      from './screens/HomeScreen';
 import StartScreen     from './screens/StartScreen';
@@ -19,6 +22,19 @@ import WorkoutDetailScreen   from './screens/WorkoutDetailScreen';
 const Stack = createNativeStackNavigator();
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    ...Feather.font,
+    ...MaterialCommunityIcons.font,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#080808', alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color="#818cf8" />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaProvider>
       <NavigationContainer>

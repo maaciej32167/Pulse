@@ -9,13 +9,10 @@ const C = {
   txt: '#f1f5f9', muted: '#64748b', accent: '#FFD700', coral: '#FF4757', cyan: '#00F5FF',
 };
 
-function StatBox({ icon, value, label, color }) {
+function StatBox({ icon, value, label, color, last }) {
   return (
-    <View style={styles.statBox}>
-      <View style={[styles.statIcon, { backgroundColor: (color || C.accent) + '18' }]}>
-        <Feather name={icon} size={15} color={color || C.accent} />
-      </View>
-      <Text style={styles.statValue}>{value}</Text>
+    <View style={[styles.statBox, !last && styles.statBoxBorder]}>
+      <Text style={[styles.statValue, { color: color || C.accent }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
@@ -73,10 +70,10 @@ export default function WorkoutDetailScreen({ navigation, route }) {
 
         {/* Statystyki */}
         <View style={styles.statsGrid}>
-          <StatBox icon="clock"       value={duration != null ? fmtDuration(duration) : '—'} label="Czas"      color={C.cyan}  />
-          <StatBox icon="layers"      value={totalSets}                                        label="Serie"     color={C.coral} />
-          <StatBox icon="bar-chart-2" value={exercises}                                        label="Ćwiczenia" color={C.cyan}  />
-          <StatBox icon="trending-up" value={`${Math.round(totalVolume)} kg`}                  label="Wolumen"   color={C.accent}/>
+          <StatBox value={duration != null ? fmtDuration(duration) : '—'} label="Czas"      color={C.cyan}  />
+          <StatBox value={exercises}                                        label="Ćwiczenia" color={C.cyan}  />
+          <StatBox value={totalSets}                                        label="Sets"      color={C.coral} />
+          <StatBox value={`${Math.round(totalVolume)} kg`}                  label="Volume"   color={C.accent} last />
         </View>
 
         {/* Ćwiczenia */}
@@ -132,14 +129,15 @@ const styles = StyleSheet.create({
   safe:    { flex: 1, backgroundColor: C.bg },
   content: { padding: 16 },
 
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  statBox: {
-    flex: 1, minWidth: '45%', backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
-    borderRadius: 14, padding: 12, gap: 5,
+  statsGrid: {
+    flexDirection: 'row', backgroundColor: C.card,
+    borderWidth: 1, borderColor: C.border, borderRadius: 14,
+    marginBottom: 14,
   },
-  statIcon:  { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  statValue: { color: C.txt, fontSize: 16, fontWeight: '800' },
-  statLabel: { color: C.muted, fontSize: 10, letterSpacing: 0.5 },
+  statBox:       { flex: 1, alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4 },
+  statBoxBorder: { borderRightWidth: 1, borderRightColor: C.border },
+  statValue:     { fontSize: 15, fontWeight: '800', marginBottom: 3 },
+  statLabel:     { color: C.muted, fontSize: 9, letterSpacing: 0.5, textTransform: 'uppercase' },
 
   card: {
     backgroundColor: C.card, borderWidth: 1, borderColor: C.border,

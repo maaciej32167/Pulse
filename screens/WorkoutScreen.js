@@ -242,7 +242,11 @@ export default function WorkoutScreen({ navigation, route }) {
 
           {activeField && <CustomKeypad showDot={activeField === 'weight'} onKey={handleKey} />}
 
-          <TouchableOpacity style={styles.btn} onPress={() => { setActiveField(null); addSet(); }}>
+          <TouchableOpacity
+            style={[styles.btn, !(selectedEx && parseFloat(weight) > 0 && parseInt(reps) > 0) && styles.btnDisabled]}
+            onPress={() => { setActiveField(null); addSet(); }}
+            disabled={!(selectedEx && parseFloat(weight) > 0 && parseInt(reps) > 0)}
+          >
             <Text style={styles.btnText}>Zapisz serię</Text>
           </TouchableOpacity>
         </View>
@@ -264,7 +268,7 @@ export default function WorkoutScreen({ navigation, route }) {
                           : `${round1(s.weight)} kg`}
                       </Text>
                       <Text style={styles.setX}>×</Text>
-                      <Text style={styles.setReps}>{s.reps}</Text>
+                      <Text style={styles.setReps}>{s.reps} <Text style={styles.setRepsLabel}>sets</Text></Text>
                     </View>
                   </View>
                 ))}
@@ -368,6 +372,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.accent, borderRadius: 12,
     padding: 14, alignItems: 'center', marginTop: 4,
   },
+  btnDisabled: { backgroundColor: 'rgba(129,140,248,0.25)' },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
   group:     { marginTop: 12 },
@@ -378,6 +383,7 @@ const styles = StyleSheet.create({
   setWeight:     { color: C.accent, fontSize: 14, fontWeight: '700' },
   setX:          { color: C.muted, fontSize: 12 },
   setReps:       { color: C.txt, fontSize: 14, fontWeight: '600' },
+  setRepsLabel:  { color: C.muted, fontSize: 11, fontWeight: '400' },
 
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
   modalSheet:   { backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '75%' },

@@ -8,6 +8,7 @@ export const KEYS = {
   bwHistory: 'sila_body_weight_history',
   bwEx:      'sila_bw_exercises',
   myGym:     'pulse_my_gym',
+  profile:   'pulse_profile',
 };
 
 export const DEFAULT_EXERCISES = [
@@ -59,4 +60,13 @@ export async function loadMyGym() {
 
 export async function saveMyGym(gym) {
   await AsyncStorage.setItem(KEYS.myGym, JSON.stringify(gym));
+}
+
+export async function loadProfile() {
+  const stored = await AsyncStorage.getItem(KEYS.profile);
+  return stored ? JSON.parse(stored) : { name: '', gym: '', location: '', photo: null };
+}
+
+export async function saveProfile(profile) {
+  await AsyncStorage.setItem(KEYS.profile, JSON.stringify(profile));
 }
