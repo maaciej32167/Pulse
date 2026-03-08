@@ -544,10 +544,7 @@ function WorkoutCard({ day, dayRecs, allRecords, navigation, bodyWeight, bwExerc
               {'  ·  '}{exercises} ćw.{'  ·  '}{dayRecs.length} serii
             </Text>
           </View>
-          <View style={{ alignItems: 'flex-end', gap: 2 }}>
-            <Text style={[styles.wCardVol, { color: C.txt }]}>{fmtDuration(duration)}</Text>
-            <Text style={styles.wCardVolSub}>{Math.round(volume)} kg</Text>
-          </View>
+          <Text style={styles.wCardVolSub}>{Math.round(volume)} kg</Text>
           <Text style={[styles.wCardChev, open && styles.wCardChevOpen]}>▾</Text>
         </View>
       </TouchableOpacity>
