@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   Alert, Modal, FlatList,
@@ -99,7 +99,7 @@ export default function WorkoutScreen({ navigation, route }) {
       setRecords(rec);
       setBodyWeight(bw);
       setBwExercises(bwEx);
-      setSelectedEx(ex[0] || '');
+      // brak domyślnego wyboru — użytkownik sam wybiera ćwiczenie
     }
     init();
   }, []);
@@ -243,6 +243,20 @@ export default function WorkoutScreen({ navigation, route }) {
 
   const isBW = bwExercises.has(selectedEx);
 
+  // Top 2 wyniki dla wybranego ćwiczenia
+  const top2 = useMemo(() => {
+    if (!selectedEx) return [];
+    const exRecs = records.filter(r => r.exercise === selectedEx);
+    const seen = new Map();
+    for (const r of exRecs) {
+      const eff = bwExercises.has(r.exercise) ? bodyWeight + Number(r.weight) : Number(r.weight);
+      const orm = estimate1RM(eff, Number(r.reps)) || 0;
+      const cur = seen.get(eff);
+      if (!cur || orm > cur.orm) seen.set(eff, { eff, reps: Number(r.reps), orm, date: r.date });
+    }
+    return Array.from(seen.values()).sort((a, b) => b.orm - a.orm).slice(0, 2);
+  }, [selectedEx, records, bodyWeight, bwExercises]);
+
   // Grupuj serie sesji po ćwiczeniu
   const groups = [];
   const map = new Map();
@@ -283,6 +297,27 @@ export default function WorkoutScreen({ navigation, route }) {
           </TouchableOpacity>
 
           {isBW && <Text style={styles.bwHint}>BW + dodatkowe · BW = {bodyWeight} kg</Text>}
+
+          {/* Top 2 wyniki */}
+          {top2.length > 0 && (
+            <View style={styles.top2Card}>
+              <Text style={styles.top2Title}>Twoje rekordy</Text>
+              {top2.map((r, i) => (
+                <View key={i} style={[styles.top2Row, i < top2.length - 1 && styles.top2RowBorder]}>
+                  <View style={[styles.top2TrophyWrap, { backgroundColor: i === 0 ? '#FFD700' : '#A8A9AD' }]}>
+                    <Text style={styles.top2TrophyIcon}>🏆</Text>
+                  </View>
+                  <Text style={[styles.top2Weight, i === 0 && { color: C.accent }]}>
+                    {isBW ? `${round1(r.eff - bodyWeight)} kg` : `${round1(r.eff)} kg`}
+                  </Text>
+                  <Text style={styles.top2X}>×</Text>
+                  <Text style={styles.top2Reps}>{r.reps}</Text>
+                  <Text style={styles.top2Orm}>1RM ≈ {round1(r.orm)} kg</Text>
+                  <Text style={styles.top2Date}>{r.date}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           <View style={styles.row}>
             <View style={styles.inputWrap}>
@@ -508,6 +543,18 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { backgroundColor: 'rgba(129,140,248,0.25)' },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
+  top2Card:      { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
+  top2Title:     { color: C.muted, fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
+  top2Row:       { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 },
+  top2RowBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  top2TrophyWrap: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  top2TrophyIcon: { fontSize: 13 },
+  top2Weight:    { color: C.txt, fontSize: 14, fontWeight: '800' },
+  top2X:         { color: C.muted, fontSize: 12 },
+  top2Reps:      { color: C.txt, fontSize: 14, fontWeight: '600', marginRight: 4 },
+  top2Orm:       { color: C.muted, fontSize: 10, flex: 1 },
+  top2Date:      { color: C.muted, fontSize: 9 },
 
   group:     { marginTop: 12 },
   groupName: { color: C.txt, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },

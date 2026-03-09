@@ -23,12 +23,23 @@
 ## Git — kontrola wersji
 
 Projekt ma git (`/Users/maciejgierlik/Documents/Aplikacje/Pulse`).
-Commity **tylko na wyraźne polecenie użytkownika** — np. "zapisz", "zrób commit".
+GitHub: **https://github.com/maaciej32167/Pulse**
 
+### Zasady
+- **`git commit`** — tylko na wyraźne polecenie użytkownika, np. "zapisz", "zrób commit"
+- **`git push`** — tylko na wyraźne polecenie użytkownika, np. "wyślij na GitHub", "git push"
+- Są to **dwie osobne operacje** — commit zapisuje lokalnie, push wysyła na GitHub
+
+### Lokalny commit
 ```bash
 cd /Users/maciejgierlik/Documents/Aplikacje/Pulse
 git add -A
 git commit -m "Opis zmiany"
+```
+
+### Wysyłanie na GitHub
+```bash
+git push
 ```
 
 Żeby wrócić do ostatniego commita (odrzucić wszystkie niezapisane zmiany):
