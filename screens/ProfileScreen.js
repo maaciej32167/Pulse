@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import Svg, { Polygon, Line, Circle, Text as SvgText } from 'react-native-svg';
+import Svg, { Polygon, Line, Circle, Path, Text as SvgText } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
 
@@ -28,8 +28,8 @@ const C = {
   border: '#1a1c2a',
   border2:'rgba(255,255,255,0.06)',
   txt:    '#ddeeff',
-  sub:    '#778899',
-  muted:  '#445566',
+  sub:    '#99aabb',
+  muted:  '#6b7f93',
   gold:   '#FFD700',
   accent: '#818cf8',
 };
@@ -296,6 +296,32 @@ function EditProfileModal({ visible, profile, onSave, onClose }) {
             </View>
           ))}
 
+          <View style={styles.modalRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.modalLabel}>Waga (kg)</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={draft.weight ? String(draft.weight) : ''}
+                onChangeText={v => set('weight', v ? parseFloat(v) || v : '')}
+                placeholder="np. 80"
+                placeholderTextColor={C.muted}
+                keyboardType="decimal-pad"
+              />
+            </View>
+            <View style={{ width: 12 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.modalLabel}>Wiek</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={draft.age ? String(draft.age) : ''}
+                onChangeText={v => set('age', v ? parseInt(v) || v : '')}
+                placeholder="np. 25"
+                placeholderTextColor={C.muted}
+                keyboardType="number-pad"
+              />
+            </View>
+          </View>
+
           <TouchableOpacity style={styles.modalSaveBtn} onPress={() => onSave(draft)}>
             <Text style={styles.modalSaveBtnText}>Zapisz</Text>
           </TouchableOpacity>
@@ -398,9 +424,9 @@ function StatsView({ records, ironPath }) {
     return fmtDurationShort(d.duration);
   };
   const METRICS = [
-    { id: 'volume', label: 'WOLUMEN' },
-    { id: 'trainings', label: 'TRENINGI' },
     { id: 'duration', label: 'CZAS' },
+    { id: 'trainings', label: 'TRENINGI' },
+    { id: 'volume', label: 'WOLUMEN' },
   ];
 
   return (
@@ -462,8 +488,8 @@ function StatsView({ records, ironPath }) {
       {/* Stat cards 2×2 */}
       <View style={styles.statGrid2}>
         {[
-          [`${mWorkouts}`,                                                                          'Treningi (mies.)'],
           [avgDur > 0 ? fmtDuration(avgDur) : '—',                                                'Śr. czas sesji'],
+          [`${mWorkouts}`,                                                                          'Treningi (mies.)'],
           [mVolume >= 1000 ? `${Math.round(mVolume / 1000)}k kg` : `${Math.round(mVolume)} kg`,   'Wolumen (mies.)'],
           [bestStr > 0 ? `${bestStr} dni` : '—',                                                   'Najdłuższy streak'],
         ].map(([val, lbl]) => (
@@ -652,12 +678,18 @@ function HistoriaDetail({ day, dayRecs, allRecords, bodyWeight, bwExercises, dat
                 ? `${round1(s.bodyWeightKg || bodyWeight)} + ${round1(s.weight)} kg`
                 : `${round1(s.weight)} kg`;
               return (
-                <View key={s.id || i} style={styles.detailSetRow}>
+                <View key={s.id || i} style={[styles.detailSetRow, s.isPR && styles.detailSetRowPR]}>
                   <Text style={styles.detailSetNum}>{i + 1}</Text>
-                  <Text style={styles.detailSetWeight}>{weightStr}</Text>
-                  <Text style={styles.detailSetX}>×</Text>
-                  <Text style={styles.detailSetReps}>{s.reps} sets</Text>
+                  <Text style={styles.detailSetWeight}>
+                    {weightStr}<Text style={styles.detailSetX}> × </Text>
+                    <Text style={styles.detailSetReps}>{s.reps}</Text>
+                  </Text>
                   <Text style={styles.detailSetVol}>{Math.round((Number(s.weight) || 0) * (Number(s.reps) || 0))} kg</Text>
+                  {s.isPR && (
+                    <View style={styles.detailPRMedal}>
+                      <Text style={styles.detailPRMedalText}>PR</Text>
+                    </View>
+                  )}
                 </View>
               );
             })}
@@ -877,13 +909,183 @@ function RekordsView({ records, bodyWeight, bwExercises }) {
   );
 }
 
+// ── Muscle distribution ───────────────────────────────────────────────────────
+
+const MUSCLE_COLORS = {
+  'Klatka':   '#FF4757',
+  'Plecy':    '#818cf8',
+  'Barki':    '#00F5FF',
+  'Nogi':     '#4ade80',
+  'Biceps':   '#a78bfa',
+  'Triceps':  '#FFD700',
+  'Brzuch':   '#f97316',
+  'Inne':     '#64748b',
+};
+
+const EX_MUSCLE = {
+  'Bench press': 'Klatka', 'Incline bench press': 'Klatka', 'Incline dumbbell press': 'Klatka',
+  'Dumbbell flye': 'Klatka', 'Cable crossovers': 'Klatka', 'Pec dec': 'Klatka',
+  'Deadlift': 'Plecy', 'Barbell row': 'Plecy', 'Cable row': 'Plecy', 'Seated row': 'Plecy',
+  'Chest-supported row': 'Plecy', '1-arm dumbbell row': 'Plecy',
+  'Wide-grip lat pulldown': 'Plecy', 'Neutral-grip lat pulldown': 'Plecy',
+  'Cable lat pull-over': 'Plecy', 'Pull Up': 'Plecy', 'Neutral Grip Pull Up': 'Plecy', 'Chin Up': 'Plecy',
+  'Overhead press': 'Barki', 'Dumbbell Overhead press': 'Barki', 'Maschine shoulder press': 'Barki',
+  'Standing dumbbell lateral raise': 'Barki', 'Cable lateral raise': 'Barki',
+  'Barbell back squat': 'Nogi', 'Leg curl': 'Nogi', 'Leg extension': 'Nogi',
+  'Glute press': 'Nogi', 'Seated calf raise': 'Nogi',
+  'Barbell curl': 'Biceps', 'Barbbell preacher curl': 'Biceps', 'Incline curl': 'Biceps',
+  'Face away bayesian Cable curl': 'Biceps',
+  'Triceps pressdown (bar)': 'Triceps', 'Overhead Cable triceps extension': 'Triceps',
+  'Skullcrusher': 'Triceps', 'Dips': 'Triceps',
+  'Allah (Cable crunch)': 'Brzuch',
+};
+
+function getMuscleData(records) {
+  const map = new Map();
+  for (const r of records) {
+    const muscle = EX_MUSCLE[r.exercise] || 'Inne';
+    map.set(muscle, (map.get(muscle) || 0) + 1);
+  }
+  return Array.from(map.entries())
+    .map(([name, value]) => ({ name, value, color: MUSCLE_COLORS[name] || MUSCLE_COLORS['Inne'] }))
+    .filter(d => d.value > 0)
+    .sort((a, b) => b.value - a.value);
+}
+
+function DonutChart({ data }) {
+  const SIZE = 140, cx = 70, cy = 70, R = 58, IR = 34;
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (!total) return null;
+
+  function pt(angle, r) {
+    const rad = (angle - 90) * Math.PI / 180;
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  }
+
+  function arc(startAngle, endAngle, color, key) {
+    const outerS = pt(startAngle, R), outerE = pt(endAngle, R);
+    const innerE = pt(endAngle, IR), innerS = pt(startAngle, IR);
+    const large  = endAngle - startAngle > 180 ? 1 : 0;
+    const d = [
+      `M ${outerS.x} ${outerS.y}`,
+      `A ${R} ${R} 0 ${large} 1 ${outerE.x} ${outerE.y}`,
+      `L ${innerE.x} ${innerE.y}`,
+      `A ${IR} ${IR} 0 ${large} 0 ${innerS.x} ${innerS.y}`,
+      'Z',
+    ].join(' ');
+    return <Path key={key} d={d} fill={color} opacity={0.9} />;
+  }
+
+  let cur = 0;
+  return (
+    <Svg width={SIZE} height={SIZE}>
+      {data.map((d, i) => {
+        const sweep = (d.value / total) * 360;
+        const seg = arc(cur, cur + sweep - 0.5, d.color, i);
+        cur += sweep;
+        return seg;
+      })}
+    </Svg>
+  );
+}
+
+function MuscleDistribution({ records }) {
+  const data  = useMemo(() => getMuscleData(records), [records]);
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (!data.length) return null;
+
+  return (
+    <View style={styles.muscleCard}>
+      <Text style={styles.muscleTitle}>Dystrybucja partii mięśniowych</Text>
+      <View style={styles.muscleBody}>
+        <DonutChart data={data} />
+        <View style={styles.muscleLegend}>
+          {data.map(d => (
+            <View key={d.name} style={styles.muscleLegendItem}>
+              <View style={[styles.muscleDot, { backgroundColor: d.color }]} />
+              <Text style={styles.muscleName}>{d.name}</Text>
+              <Text style={[styles.musclePct, { color: d.color }]}>
+                {Math.round(d.value / total * 100)}%
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ── ReportCalendar ────────────────────────────────────────────────────────────
+
+function ReportCalendar({ dayMap, year, month, daysInMon, stats }) {
+  const calWeeks = useMemo(() => {
+    const startDow = (new Date(year, month, 1).getDay() + 6) % 7;
+    const prevDays = new Date(year, month, 0).getDate();
+    const cells = [];
+    for (let i = startDow - 1; i >= 0; i--)
+      cells.push({ day: prevDays - i, cur: false, ts: null });
+    for (let d = 1; d <= daysInMon; d++)
+      cells.push({ day: d, cur: true, ts: new Date(year, month, d).getTime() });
+    const rem = (7 - (cells.length % 7)) % 7;
+    for (let d = 1; d <= rem; d++) cells.push({ day: d, cur: false, ts: null });
+    const rows = [];
+    for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+    return rows;
+  }, [year, month, daysInMon]);
+
+  const isToday    = ts => ts && startOfDay(ts) === startOfDay(Date.now());
+  const hasWorkout = ts => ts && dayMap.has(startOfDay(ts));
+
+  return (
+    <View style={styles.reportCalCard}>
+      <View style={styles.calDaysRow}>
+        {DAYS_SHORT.map(d => (
+          <View key={d} style={styles.calDayHeader}>
+            <Text style={styles.calDayHeaderText}>{d}</Text>
+          </View>
+        ))}
+      </View>
+      {calWeeks.map((week, wi) => (
+        <View key={wi} style={styles.calWeekRow}>
+          {week.map((cell, ci) => {
+            const workout = hasWorkout(cell.ts);
+            const tod     = isToday(cell.ts);
+            return (
+              <View key={ci} style={[styles.calCell, workout && styles.calCellWorkout, tod && !workout && styles.calCellToday]}>
+                <Text style={[styles.calCellText, !cell.cur && styles.calCellGhost, workout && styles.calCellWorkoutText, tod && styles.calCellTodayText]}>
+                  {cell.day}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      ))}
+      <View style={styles.calSummary}>
+        {[
+          ['Treningów', stats.workouts, RED],
+          ['Przerw', daysInMon - stats.workouts, C.muted],
+          ['Aktywność', `${Math.round(stats.workouts / daysInMon * 100)}%`, C.sub],
+        ].map(([l, v, c]) => (
+          <View key={l} style={{ alignItems: 'center' }}>
+            <Text style={[styles.calSumVal, { color: c }]}>{v}</Text>
+            <Text style={styles.calSumLbl}>{l}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 // ── MonthlyReportView ─────────────────────────────────────────────────────────
 
 function MonthlyReportView({ records }) {
   const today = new Date();
-  const [year,   setYear]   = useState(today.getFullYear());
-  const [month,  setMonth]  = useState(today.getMonth());
-  const [metric, setMetric] = useState('volume');
+  const [year,          setYear]         = useState(today.getFullYear());
+  const [month,         setMonth]        = useState(today.getMonth());
+  const [metric,        setMetric]       = useState('volume');
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerYear,    setPickerYear]   = useState(today.getFullYear());
+  const [mode,          setMode]         = useState('month'); // 'month' | 'year'
 
   const dayMap = useMemo(() => groupByDay(records), [records]);
 
@@ -923,30 +1125,41 @@ function MonthlyReportView({ records }) {
     return weeks;
   }, [dayMap, year, month, daysInMon, metric]);
 
-  // ── Calendar grid
-  const calWeeks = useMemo(() => {
-    const startDow = (new Date(year, month, 1).getDay() + 6) % 7; // Mon=0
-    const prevDays = new Date(year, month, 0).getDate();
-    const cells = [];
-    for (let i = startDow - 1; i >= 0; i--)
-      cells.push({ day: prevDays - i, cur: false, ts: null });
-    for (let d = 1; d <= daysInMon; d++)
-      cells.push({ day: d, cur: true, ts: new Date(year, month, d).getTime() });
-    const rem = (7 - (cells.length % 7)) % 7;
-    for (let d = 1; d <= rem; d++)
-      cells.push({ day: d, cur: false, ts: null });
-    const rows = [];
-    for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
-    return rows;
-  }, [year, month, daysInMon]);
 
   // ── Navigation
   const isCurrent = year === today.getFullYear() && month === today.getMonth();
-  function prevMonth() { if (month === 0) { setYear(y => y-1); setMonth(11); } else setMonth(m => m-1); }
-  function nextMonth() { if (isCurrent) return; if (month === 11) { setYear(y => y+1); setMonth(0); } else setMonth(m => m+1); }
+  function prevMonth() { if (mode === 'year') { setYear(y => y-1); return; } if (month === 0) { setYear(y => y-1); setMonth(11); } else setMonth(m => m-1); }
+  function nextMonth() { if (mode === 'year') { if (year < today.getFullYear()) setYear(y => y+1); return; } if (isCurrent) return; if (month === 11) { setYear(y => y+1); setMonth(0); } else setMonth(m => m+1); }
+
+  // ── Yearly stats
+  const yearStart = new Date(year, 0, 1).getTime();
+  const yearEnd   = new Date(year, 11, 31, 23, 59, 59).getTime();
+  const yearStats = useMemo(() => {
+    let workouts = 0, duration = 0, volume = 0, sets = 0;
+    for (const [day, recs] of dayMap) {
+      if (day < yearStart || day > yearEnd) continue;
+      workouts++; duration += getDayDurationMs(recs); volume += getDayVolume(recs); sets += recs.length;
+    }
+    return { workouts, duration, volume, sets };
+  }, [dayMap, year]);
+
+  const yearChartData = useMemo(() => MONTHS_PL.map((lbl, i) => {
+    const mS = new Date(year, i, 1).getTime();
+    const mE = new Date(year, i + 1, 0, 23, 59, 59).getTime();
+    let value = 0;
+    for (const [day, recs] of dayMap) {
+      if (day < mS || day > mE) continue;
+      if      (metric === 'volume')   value += getDayVolume(recs);
+      else if (metric === 'duration') value += getDayDurationMs(recs);
+      else if (metric === 'workouts') value += 1;
+      else                            value += recs.length;
+    }
+    return { label: lbl.slice(0, 3).toUpperCase(), value };
+  }), [dayMap, year, metric]);
 
   // ── Chart bar renderer
-  const maxVal = Math.max(...chartData.map(d => d.value), 1);
+  const activeChartData = mode === 'year' ? yearChartData : chartData;
+  const maxVal = Math.max(...activeChartData.map(d => d.value), 1);
   const BAR_H  = 80;
   function fmtBarVal(v) {
     if (metric === 'volume')   return v >= 1000 ? `${Math.round(v/1000)}k` : `${Math.round(v)}`;
@@ -954,16 +1167,25 @@ function MonthlyReportView({ records }) {
     return `${v}`;
   }
 
-  // ── Stat card definitions
-  const STAT_CARDS = [
-    { id: 'workouts', label: 'TRENINGI', value: `${stats.workouts}` },
-    { id: 'duration', label: 'CZAS',     value: stats.duration > 0 ? fmtDuration(stats.duration) : '—' },
-    { id: 'volume',   label: 'WOLUMEN',  value: stats.volume >= 1000 ? `${Math.round(stats.volume/1000)}k kg` : `${Math.round(stats.volume)} kg` },
-    { id: 'sets',     label: 'SERIE',    value: `${stats.sets}` },
-  ];
+  // ── Active records for the selected period
+  const periodStart = mode === 'year' ? yearStart : mStart;
+  const periodEnd   = mode === 'year' ? yearEnd   : mEnd;
+  const activeRecords = useMemo(() =>
+    records.filter(r => {
+      const ts = r.timestamp || 0;
+      return ts >= periodStart && ts <= periodEnd;
+    }),
+    [records, periodStart, periodEnd]
+  );
 
-  const isToday    = ts => ts && startOfDay(ts) === startOfDay(Date.now());
-  const hasWorkout = ts => ts && dayMap.has(startOfDay(ts));
+  // ── Stat card definitions
+  const activeStats = mode === 'year' ? yearStats : stats;
+  const STAT_CARDS = [
+    { id: 'workouts', label: 'TRENINGI', value: `${activeStats.workouts}` },
+    { id: 'duration', label: 'CZAS',     value: activeStats.duration > 0 ? fmtDuration(activeStats.duration) : '—' },
+    { id: 'volume',   label: 'WOLUMEN',  value: `${Math.round(activeStats.volume).toLocaleString('pl-PL')} kg` },
+    { id: 'sets',     label: 'SERIE',    value: `${activeStats.sets}` },
+  ];
 
   return (
     <ScrollView contentContainerStyle={styles.padded} showsVerticalScrollIndicator={false}>
@@ -973,11 +1195,81 @@ function MonthlyReportView({ records }) {
         <TouchableOpacity onPress={prevMonth} hitSlop={16}>
           <Feather name="chevron-left" size={22} color={C.txt} />
         </TouchableOpacity>
-        <Text style={styles.monthNavTitle}>{MONTHS_PL[month].toUpperCase()} {year}</Text>
-        <TouchableOpacity onPress={nextMonth} hitSlop={16} style={{ opacity: isCurrent ? 0.2 : 1 }}>
+        <TouchableOpacity
+          onPress={() => { setPickerYear(year); setPickerVisible(true); }}
+          activeOpacity={0.7} style={styles.monthNavPill}
+        >
+          <Text style={styles.monthNavTitle}>
+            {mode === 'year' ? `ROK ${year}` : `${MONTHS_PL[month].toUpperCase()} ${year}`}
+          </Text>
+          <Feather name="chevron-down" size={13} color={C.muted} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={nextMonth} hitSlop={16} style={{ opacity: (mode === 'year' ? year >= today.getFullYear() : isCurrent) ? 0.2 : 1 }}>
           <Feather name="chevron-right" size={22} color={C.txt} />
         </TouchableOpacity>
       </View>
+
+      {/* Month/Year picker modal */}
+      <Modal visible={pickerVisible} animationType="slide" transparent onRequestClose={() => setPickerVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Wybierz miesiąc</Text>
+              <TouchableOpacity onPress={() => setPickerVisible(false)} hitSlop={12}>
+                <Feather name="x" size={20} color={C.sub} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Year selector */}
+            <View style={styles.pickerYearRow}>
+              <TouchableOpacity onPress={() => setPickerYear(y => y - 1)} hitSlop={12}>
+                <Feather name="chevron-left" size={20} color={C.txt} />
+              </TouchableOpacity>
+              <Text style={styles.pickerYearLabel}>{pickerYear}</Text>
+              <TouchableOpacity
+                onPress={() => setPickerYear(y => y + 1)}
+                hitSlop={12}
+                style={{ opacity: pickerYear >= today.getFullYear() ? 0.2 : 1 }}
+                disabled={pickerYear >= today.getFullYear()}
+              >
+                <Feather name="chevron-right" size={20} color={C.txt} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Yearly report option */}
+            <TouchableOpacity
+              style={[styles.pickerYearlyBtn, mode === 'year' && pickerYear === year && styles.pickerMonthCellActive]}
+              onPress={() => { setYear(pickerYear); setMode('year'); setPickerVisible(false); }}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.pickerYearlyText, mode === 'year' && pickerYear === year && styles.pickerMonthTextActive]}>
+                Raport roczny {pickerYear}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Month grid */}
+            <View style={styles.pickerMonthGrid}>
+              {MONTHS_PL.map((m, i) => {
+                const isFuture = pickerYear === today.getFullYear() && i > today.getMonth();
+                const isActive = pickerYear === year && i === month;
+                return (
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.pickerMonthCell, isActive && styles.pickerMonthCellActive, isFuture && { opacity: 0.25 }]}
+                    disabled={isFuture}
+                    onPress={() => { setYear(pickerYear); setMonth(i); setMode('month'); setPickerVisible(false); }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.pickerMonthText, isActive && styles.pickerMonthTextActive]}>
+                      {m.slice(0, 3).toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* 4 stat cards — tap to switch chart */}
       <View style={styles.statGrid2}>
@@ -998,10 +1290,10 @@ function MonthlyReportView({ records }) {
       {/* Bar chart — weekly */}
       <View style={styles.chartCard}>
         <Text style={styles.chartCardTitle}>
-          {STAT_CARDS.find(s => s.id === metric)?.label} · tygodniowo
+          {STAT_CARDS.find(s => s.id === metric)?.label} · {mode === 'year' ? 'miesięcznie' : 'tygodniowo'}
         </Text>
         <View style={styles.chartBarsRow}>
-          {chartData.map((d, i) => {
+          {activeChartData.map((d, i) => {
             const h   = Math.max(d.value > 0 ? Math.round((d.value / maxVal) * BAR_H) : 0, d.value > 0 ? 3 : 0);
             const isM = d.value === Math.max(...chartData.map(x => x.value)) && d.value > 0;
             return (
@@ -1019,54 +1311,13 @@ function MonthlyReportView({ records }) {
         </View>
       </View>
 
-      {/* Calendar */}
-      <View style={styles.reportCalCard}>
-        <View style={styles.calDaysRow}>
-          {DAYS_SHORT.map(d => (
-            <View key={d} style={styles.calDayHeader}>
-              <Text style={styles.calDayHeaderText}>{d}</Text>
-            </View>
-          ))}
-        </View>
-        {calWeeks.map((week, wi) => (
-          <View key={wi} style={styles.calWeekRow}>
-            {week.map((cell, ci) => {
-              const workout = hasWorkout(cell.ts);
-              const tod     = isToday(cell.ts);
-              return (
-                <View key={ci} style={[
-                  styles.calCell,
-                  workout && styles.calCellWorkout,
-                  tod && !workout && styles.calCellToday,
-                ]}>
-                  <Text style={[
-                    styles.calCellText,
-                    !cell.cur      && styles.calCellGhost,
-                    workout        && styles.calCellWorkoutText,
-                    tod            && styles.calCellTodayText,
-                  ]}>
-                    {cell.day}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        ))}
+      {/* Calendar — only in month mode */}
+      {mode === 'month' && (
+        <ReportCalendar dayMap={dayMap} year={year} month={month} daysInMon={daysInMon} stats={stats} />
+      )}
 
-        {/* Summary row */}
-        <View style={styles.calSummary}>
-          {[
-            ['Treningów', stats.workouts, RED],
-            ['Przerw', daysInMon - stats.workouts, C.muted],
-            ['Aktywność', `${Math.round(stats.workouts / daysInMon * 100)}%`, C.sub],
-          ].map(([l, v, c]) => (
-            <View key={l} style={{ alignItems: 'center' }}>
-              <Text style={[styles.calSumVal, { color: c }]}>{v}</Text>
-              <Text style={styles.calSumLbl}>{l}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
+      {/* Muscle distribution */}
+      <MuscleDistribution records={activeRecords} />
 
       <View style={{ height: 32 }} />
     </ScrollView>
@@ -1224,6 +1475,7 @@ export default function ProfileScreen({ navigation }) {
   async function handleSaveProfile(draft) {
     await saveProfile(draft);
     setProfile(draft);
+    if (draft.weight) setBodyWeight(parseFloat(draft.weight));
     setEditVisible(false);
   }
 
@@ -1449,6 +1701,16 @@ const styles = StyleSheet.create({
   detailSetX:      { color: C.muted, fontSize: 11 },
   detailSetReps:   { color: C.txt, fontSize: 12, fontWeight: '600' },
   detailSetVol:    { color: C.muted, fontSize: 10, minWidth: 50, textAlign: 'right' },
+  detailSetRowPR:  { backgroundColor: 'rgba(255,215,0,0.06)' },
+  detailPRMedal: {
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: '#FFD700', borderWidth: 2, borderColor: '#B8860B',
+    alignItems: 'center', justifyContent: 'center', marginLeft: 4,
+  },
+  detailPRMedalText: {
+    color: '#000', fontSize: 7, fontWeight: '900',
+    fontStyle: 'italic', letterSpacing: 0.8, fontFamily: 'Georgia',
+  },
 
   // RekordsView
   rekordyToolbar: {
@@ -1516,14 +1778,49 @@ const styles = StyleSheet.create({
   monthNav: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16,
   },
-  monthNavTitle: {
-    color: C.txt, fontSize: 13, fontWeight: '800', letterSpacing: 1.5,
+  monthNavTitleWrap:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  monthNavTitle:       { color: C.txt, fontSize: 13, fontWeight: '800', letterSpacing: 1.5 },
+  monthNavPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
   },
+  monthNavPillActive: { backgroundColor: `${RED}18` },
+
+  pickerYearRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 24, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border,
+  },
+  pickerYearLabel: { color: C.txt, fontSize: 18, fontWeight: '800', minWidth: 60, textAlign: 'center' },
+  pickerYearlyBtn: {
+    marginHorizontal: 12, marginTop: 12, paddingVertical: 12, alignItems: 'center',
+    borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.card,
+  },
+  pickerYearlyText: { color: C.sub, fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
+  pickerMonthGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 12, gap: 8 },
+  pickerMonthCell: {
+    width: '22%', paddingVertical: 12, alignItems: 'center',
+    borderRadius: 10, borderWidth: 1, borderColor: C.border,
+  },
+  pickerMonthCellActive:  { backgroundColor: RED, borderColor: RED },
+  pickerMonthText:        { color: C.sub, fontSize: 12, fontWeight: '700' },
+  pickerMonthTextActive:  { color: '#fff' },
   statCard2Active: { borderColor: `${RED}55`, backgroundColor: `${RED}0a` },
   statCard2Dot: {
     position: 'absolute', bottom: 8, right: 8,
     width: 5, height: 5, borderRadius: 2.5, backgroundColor: RED,
   },
+  muscleCard: {
+    backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border,
+    padding: 14, marginTop: 12,
+  },
+  muscleTitle: { color: C.muted, fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
+  muscleBody:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  muscleLegend:{ flex: 1, gap: 7 },
+  muscleLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  muscleDot:   { width: 8, height: 8, borderRadius: 4 },
+  muscleName:  { flex: 1, color: C.sub, fontSize: 11 },
+  musclePct:   { fontSize: 11, fontWeight: '800' },
+
   reportCalCard: {
     backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border,
     padding: 14, marginTop: 12,
@@ -1589,6 +1886,7 @@ const styles = StyleSheet.create({
   modalHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle:    { color: C.txt, fontSize: 16, fontWeight: '800' },
   modalLabel:    { color: C.muted, fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 6, marginTop: 12 },
+  modalRow:      { flexDirection: 'row', marginTop: 0 },
   modalInput: {
     backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
     borderRadius: 10, padding: 12, color: C.txt, fontSize: 14,

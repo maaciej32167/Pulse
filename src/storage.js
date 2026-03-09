@@ -231,6 +231,8 @@ export async function loadProfile() {
     gym:      '',
     location: '',
     photo:    null,
+    weight:   null,   // kg
+    age:      null,
   };
 }
 
