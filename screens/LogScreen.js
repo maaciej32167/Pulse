@@ -88,7 +88,7 @@ export default function LogScreen({ navigation }) {
   }
 
   function handleNoGym() {
-    setSelected({ id: null, name: 'Bez miejsca', address: '' });
+    setSelected({ id: null, name: null, address: '' });
   }
 
   function handleStartWorkout() {

@@ -746,6 +746,17 @@ function HistoriaView({ records, bodyWeight, bwExercises }) {
   );
 }
 
+function resolveTs(r) {
+  if (r.timestamp) return Number(r.timestamp);
+  if (r.isoDate)   return new Date(r.isoDate).getTime();
+  if (r.date && r.date.includes('.')) {
+    const [d, m, y] = r.date.split('.');
+    const t = new Date(`${y}-${m}-${d}`).getTime();
+    if (!isNaN(t)) return t;
+  }
+  return 0;
+}
+
 // ── RekordsView ───────────────────────────────────────────────────────────────
 
 function fmtRowWeight(row) {
@@ -776,7 +787,7 @@ function RekordsView({ records, bodyWeight, bwExercises }) {
     return {
       ex: r.exercise, eff, extra, bwAt, bw,
       reps, date: r.date || '—',
-      ts: Number(r.timestamp) || 0,
+      ts: resolveTs(r),
       orm, volume,
     };
   }
@@ -801,13 +812,8 @@ function RekordsView({ records, bodyWeight, bwExercises }) {
       return Array.from(byWeight.values()).sort(sorter);
     }
 
-    // All exercises: all sets globally, sorted by weight desc then reps desc
-    const allRows = records.map(toRow);
-    return allRows.sort((a, b) => {
-      const wDiff = b.eff - a.eff;
-      if (wDiff !== 0) return wDiff;
-      return b.reps - a.reps;
-    });
+    // All exercises: all sets globally, sorted by active sorter
+    return records.map(toRow).sort(sorter);
   }, [records, filterEx, sortKey, sortDir, bodyWeight, bwExercises]);
 
   function toggleSort(key) {
@@ -817,10 +823,10 @@ function RekordsView({ records, bodyWeight, bwExercises }) {
 
   const arr = sortDir === 'desc' ? '↓' : '↑';
   const SORT_BTNS = [
+    { key: 'date',   label: 'Data' },
     { key: 'weight', label: 'Ciężar' },
     { key: 'reps',   label: 'Powt.' },
     { key: 'orm',    label: '1RM' },
-    { key: 'date',   label: 'Data' },
   ];
 
   if (!records.length)

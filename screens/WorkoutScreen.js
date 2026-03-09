@@ -278,7 +278,7 @@ export default function WorkoutScreen({ navigation, route }) {
             <View style={styles.timerDot} />
             <Text style={styles.timerText}>{timerLabel}</Text>
           </View>
-          <Text style={styles.gymLabel} numberOfLines={1}>{gym.name}</Text>
+          {!!gym?.name && <Text style={styles.gymLabel} numberOfLines={1}>{gym.name}</Text>}
         </View>
         <TouchableOpacity style={styles.finishBtn} onPress={handleFinish} activeOpacity={0.8}>
           <Text style={styles.finishBtnText}>Zakończ</Text>

@@ -1,5 +1,20 @@
 # CLAUDE.md — Siła Native (React Native)
 
+## Ostatnie aktualizacje
+
+> **Aktualizuj tę sekcję po każdym `git commit` / `git push`** — krótki opis co zostało zmienione.
+
+| Data | Commit | Zmiany |
+|---|---|---|
+| 09.03.2026 | `40d7934` | Tygodnie Pn–Nd w stats i raporcie, domyślna metryka = CZAS, kafelki podsumowania kompaktowe |
+| 09.03.2026 | `c80e0e5` | Workout: brak domyślnego ćwiczenia, top 2 rekordy ze złotym/srebrnym trofeum |
+| 09.03.2026 | `680f502` | Raport: picker miesiąc/rok, tryb roczny, donut chart partii mięśniowych |
+| 09.03.2026 | `4616747` | Struktura danych AsyncStorage v2, PR detection podczas treningu, spójność kolorów |
+| 09.03.2026 | `34d3d63` | Edycja i usuwanie serii w treningu (z potwierdzeniem), `src/colors.js` |
+| 09.03.2026 | `0cb7160` | Profil: pełny redesign (hero, Iron Path radar, 5 zakładek, zdjęcie, RPG) |
+
+---
+
 ## Reguły pracy
 
 - **Przed nietrywialną zmianą** — przedstaw plan i zapytaj o zgodę

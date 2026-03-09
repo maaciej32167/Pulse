@@ -86,9 +86,9 @@ export default function SummaryScreen({ navigation, route }) {
           </View>
           <Text style={styles.heroTitle}>TRENING UKOŃCZONY</Text>
           <View style={styles.heroMeta}>
-            <Text style={styles.heroPin}>📍</Text>
-            <Text style={styles.heroGym}>{gym.name}</Text>
-            <View style={styles.heroDot} />
+            {!!gym?.name && <Text style={styles.heroPin}>📍</Text>}
+            {!!gym?.name && <Text style={styles.heroGym}>{gym.name}</Text>}
+            {!!gym?.name && <View style={styles.heroDot} />}
             <Text style={styles.heroTime}>{formatTime(startTime)} – {formatTime(endTime)}</Text>
           </View>
         </View>
