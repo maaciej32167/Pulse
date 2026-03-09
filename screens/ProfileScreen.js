@@ -690,7 +690,7 @@ function HistoriaDetail({ day, dayRecs, allRecords, bodyWeight, bwExercises, dat
                   <Text style={styles.detailSetNum}>{i + 1}</Text>
                   <Text style={styles.detailSetWeight}>
                     {weightStr}<Text style={styles.detailSetX}> × </Text>
-                    <Text style={styles.detailSetReps}>{s.reps}</Text>
+                    <Text style={styles.detailSetReps}>{s.reps} reps</Text>
                   </Text>
                   <Text style={styles.detailSetVol}>{Math.round((Number(s.weight) || 0) * (Number(s.reps) || 0))} kg</Text>
                   {s.isPR && (
@@ -907,8 +907,9 @@ function RekordsView({ records, bodyWeight, bwExercises }) {
             </View>
             {/* Right: weight × reps + sub */}
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={[styles.prWeightReps, index === 0 && { color: RED }]}>
-                {fmtRowWeight(item)} × {item.reps} sets
+              <Text style={styles.prWeightReps}>
+                <Text style={{ color: RED }}>{fmtRowWeight(item)}</Text>
+                <Text style={{ color: C.txt }}> × {item.reps} reps</Text>
               </Text>
               <Text style={styles.prSubLine}>
                 {item.orm ? `1RM ≈ ${round1(item.orm)} kg` : ''}

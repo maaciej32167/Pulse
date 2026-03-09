@@ -307,11 +307,11 @@ export default function WorkoutScreen({ navigation, route }) {
                   <View style={[styles.top2TrophyWrap, { backgroundColor: i === 0 ? '#FFD700' : '#A8A9AD' }]}>
                     <Text style={styles.top2TrophyIcon}>🏆</Text>
                   </View>
-                  <Text style={[styles.top2Weight, i === 0 && { color: C.accent }]}>
+                  <Text style={[styles.top2Weight, { color: C.accent }]}>
                     {isBW ? `${round1(r.eff - bodyWeight)} kg` : `${round1(r.eff)} kg`}
                   </Text>
                   <Text style={styles.top2X}>×</Text>
-                  <Text style={styles.top2Reps}>{r.reps}</Text>
+                  <Text style={styles.top2Reps}>{r.reps} reps</Text>
                   <Text style={styles.top2Orm}>1RM ≈ {round1(r.orm)} kg</Text>
                   <Text style={styles.top2Date}>{r.date}</Text>
                 </View>
@@ -372,7 +372,7 @@ export default function WorkoutScreen({ navigation, route }) {
                           : `${round1(s.weight)} kg`}
                       </Text>
                       <Text style={styles.setX}>×</Text>
-                      <Text style={styles.setReps}>{s.reps} <Text style={styles.setRepsLabel}>sets</Text></Text>
+                      <Text style={styles.setReps}>{s.reps} reps</Text>
                     </View>
                     <View style={styles.setActions}>
                       {s.isPR && (

@@ -110,7 +110,7 @@ export default function WorkoutDetailScreen({ navigation, route }) {
                     <View style={styles.setWeightReps}>
                       <Text style={styles.setWeight}>{weightStr}</Text>
                       <Text style={styles.setX}>×</Text>
-                      <Text style={styles.setReps}>{s.reps} powt.</Text>
+                      <Text style={styles.setReps}>{s.reps} reps</Text>
                     </View>
                     <Text style={styles.setVol}>{Math.round(s.weight * s.reps)} kg</Text>
                   </View>
