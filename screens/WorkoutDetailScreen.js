@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import ScreenHeader from '../components/ScreenHeader';
 import { round1, estimate1RM } from '../src/utils';
+import { COLORS } from '../src/colors';
 
 const C = {
   bg: '#0A0A0C', card: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.08)',
@@ -64,7 +65,7 @@ export default function WorkoutDetailScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenHeader navigation={navigation} icon="activity" label={date} color={C.accent} />
+      <ScreenHeader navigation={navigation} icon="activity" label={date} color={COLORS.historia} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 

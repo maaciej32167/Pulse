@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import ScreenHeader from '../components/ScreenHeader';
+import { COLORS } from '../src/colors';
 
 // ─── design tokens ────────────────────────────────────────────────────────────
 
@@ -155,7 +156,7 @@ export default function GymScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenHeader navigation={navigation} icon="map-pin" label={gym.name ?? 'SIŁOWNIA'} color={C.cyan} />
+      <ScreenHeader navigation={navigation} icon="map-pin" label={gym.name ?? 'SIŁOWNIA'} color={COLORS.discover} />
 
       <ScrollView
         style={styles.scroll}

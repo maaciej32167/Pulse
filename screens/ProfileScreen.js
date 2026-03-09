@@ -15,6 +15,7 @@ import {
 } from '../src/storage';
 import ScreenHeader from '../components/ScreenHeader';
 import { estimate1RM, round1, effectiveWeight } from '../src/utils';
+import { COLORS } from '../src/colors';
 
 if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
 
@@ -511,7 +512,7 @@ function groupExSets(dayRecs, prSet = new Set()) {
   });
 }
 
-function WorkoutCard({ day, dayRecs, allRecords, navigation, bodyWeight, bwExercises }) {
+function WorkoutCard({ day, dayRecs, allRecords, bodyWeight, bwExercises, onSelect }) {
   const [open, setOpen] = useState(false);
   const date      = dayRecs[0]?.date || new Date(day).toLocaleDateString('pl-PL');
   const exercises = [...new Set(dayRecs.map(r => r.exercise))].length;
@@ -552,7 +553,6 @@ function WorkoutCard({ day, dayRecs, allRecords, navigation, bodyWeight, bwExerc
       {open && (
         <View style={styles.wCardBody}>
           <View style={styles.wCardDivider} />
-          {/* Table header */}
           <View style={styles.exTableHeader}>
             {['Ćwiczenie', 'Sets', 'Volume'].map((h, i) => (
               <Text key={h} style={[styles.exTableHead, i > 0 && { textAlign: 'right' }]}>{h}</Text>
@@ -565,14 +565,10 @@ function WorkoutCard({ day, dayRecs, allRecords, navigation, bodyWeight, bwExerc
               <Text style={[styles.exWeight, row.pr && { color: RED, fontWeight: '700' }]}>{row.volume}</Text>
             </View>
           ))}
-          {/* Actions */}
           <View style={styles.wCardActions}>
             <TouchableOpacity
               style={styles.wCardActionBtn}
-              onPress={() => navigation.navigate('WorkoutDetail', {
-                date, records: dayRecs, bodyWeight,
-                bwExercises: Array.from(bwExercises), allRecords,
-              })}
+              onPress={() => onSelect({ day, dayRecs, allRecords, bodyWeight, bwExercises, date })}
             >
               <Text style={styles.wCardActionText}>SZCZEGÓŁY</Text>
             </TouchableOpacity>
@@ -583,9 +579,108 @@ function WorkoutCard({ day, dayRecs, allRecords, navigation, bodyWeight, bwExerc
   );
 }
 
-function HistoriaView({ records, navigation, bodyWeight, bwExercises }) {
-  const dayMap = useMemo(() => groupByDay(records), [records]);
-  const days   = useMemo(() => Array.from(dayMap.keys()).sort((a, b) => b - a), [dayMap]);
+// ── HistoriaDetail (inline workout detail) ────────────────────────────────────
+
+function HistoriaDetail({ day, dayRecs, allRecords, bodyWeight, bwExercises, date, onBack }) {
+  const groups = [];
+  const map = new Map();
+  for (const r of dayRecs) {
+    if (!map.has(r.exercise)) { map.set(r.exercise, []); groups.push({ exercise: r.exercise, sets: map.get(r.exercise) }); }
+    map.get(r.exercise).push(r);
+  }
+
+  const totalVolume = dayRecs.reduce((s, r) => s + (Number(r.weight) || 0) * (Number(r.reps) || 0), 0);
+  const timestamps  = dayRecs.map(r => r.timestamp || 0).filter(Boolean);
+  const dayStart    = timestamps.length ? Math.min(...timestamps) : 0;
+  const duration    = timestamps.length > 1 ? Math.max(...timestamps) - Math.min(...timestamps) : null;
+
+  const prMap = new Map(), prSet = new Set();
+  for (const { exercise, sets } of groups) {
+    const bestCur = Math.max(...sets.map(s => estimate1RM(Number(s.weight), Number(s.reps)) || 0));
+    if (bestCur > 0) prMap.set(exercise, round1(bestCur));
+    const prev = allRecords.filter(r => r.exercise === exercise && (r.timestamp || 0) < dayStart);
+    if (prev.length) {
+      const bestPrev = Math.max(...prev.map(r => estimate1RM(Number(r.weight), Number(r.reps)) || 0));
+      if (bestCur > bestPrev) prSet.add(exercise);
+    }
+  }
+
+  return (
+    <ScrollView contentContainerStyle={styles.listPad} showsVerticalScrollIndicator={false}>
+      {/* Back + title */}
+      <TouchableOpacity style={styles.detailBack} onPress={onBack} activeOpacity={0.7}>
+        <Feather name="chevron-left" size={16} color={RED} />
+        <Text style={styles.detailBackText}>Historia</Text>
+      </TouchableOpacity>
+      <Text style={styles.detailDate}>{date}</Text>
+
+      {/* Stat row */}
+      <View style={styles.detailStats}>
+        {[
+          [duration != null ? fmtDuration(duration) : '—', 'Czas'],
+          [groups.length,                                   'Ćwiczenia'],
+          [dayRecs.length,                                  'Sets'],
+          [`${Math.round(totalVolume)} kg`,                 'Volume'],
+        ].map(([v, l], i, arr) => (
+          <View key={l} style={[styles.detailStatItem, i < arr.length - 1 && styles.detailStatBorder]}>
+            <Text style={styles.detailStatVal}>{v}</Text>
+            <Text style={styles.detailStatLbl}>{l}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Exercise cards */}
+      {groups.map(({ exercise, sets }) => {
+        const pr1RM = prMap.get(exercise);
+        const isPR  = prSet.has(exercise);
+        const isBW  = bwExercises && bwExercises.has(exercise);
+        return (
+          <View key={exercise} style={styles.detailCard}>
+            <View style={styles.detailCardHeader}>
+              <Text style={styles.detailExName}>{exercise}</Text>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {isPR && (
+                  <View style={styles.detailPRBadge}>
+                    <Text style={styles.detailPRText}>★ PR</Text>
+                  </View>
+                )}
+                {pr1RM && <Text style={styles.detailOrm}>1RM ≈ {pr1RM} kg</Text>}
+              </View>
+            </View>
+            {sets.map((s, i) => {
+              const weightStr = isBW
+                ? `${round1(s.bodyWeightKg || bodyWeight)} + ${round1(s.weight)} kg`
+                : `${round1(s.weight)} kg`;
+              return (
+                <View key={s.id || i} style={styles.detailSetRow}>
+                  <Text style={styles.detailSetNum}>{i + 1}</Text>
+                  <Text style={styles.detailSetWeight}>{weightStr}</Text>
+                  <Text style={styles.detailSetX}>×</Text>
+                  <Text style={styles.detailSetReps}>{s.reps} sets</Text>
+                  <Text style={styles.detailSetVol}>{Math.round((Number(s.weight) || 0) * (Number(s.reps) || 0))} kg</Text>
+                </View>
+              );
+            })}
+          </View>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+function HistoriaView({ records, bodyWeight, bwExercises }) {
+  const dayMap    = useMemo(() => groupByDay(records), [records]);
+  const days      = useMemo(() => Array.from(dayMap.keys()).sort((a, b) => b - a), [dayMap]);
+  const [selected, setSelected] = useState(null);
+
+  if (selected) {
+    return (
+      <HistoriaDetail
+        {...selected}
+        onBack={() => setSelected(null)}
+      />
+    );
+  }
 
   if (!days.length) {
     return <View style={styles.empty}><Text style={styles.emptyText}>Brak treningów</Text></View>;
@@ -602,9 +697,9 @@ function HistoriaView({ records, navigation, bodyWeight, bwExercises }) {
           day={day}
           dayRecs={dayMap.get(day)}
           allRecords={records}
-          navigation={navigation}
           bodyWeight={bodyWeight}
           bwExercises={bwExercises}
+          onSelect={setSelected}
         />
       )}
     />
@@ -1138,7 +1233,7 @@ export default function ProfileScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe}>
       {/* Górna belka — nienaruszona */}
-      <ScreenHeader navigation={navigation} icon="user" label="PROFIL" color={C.accent} />
+      <ScreenHeader navigation={navigation} icon="user" label="PROFIL" color={COLORS.profil} />
 
       {/* Profil hero */}
       <ProfileHero profile={profile} records={records} onEditPress={() => setEditVisible(true)} />
@@ -1169,7 +1264,7 @@ export default function ProfileScreen({ navigation }) {
       </View>
 
       {tab === 'stats'    && <StatsView    records={records} ironPath={ironPath} />}
-      {tab === 'historia' && <HistoriaView records={records} navigation={navigation} bodyWeight={bodyWeight} bwExercises={bwExercises} />}
+      {tab === 'historia' && <HistoriaView records={records} bodyWeight={bodyWeight} bwExercises={bwExercises} />}
       {tab === 'rekordy'  && <RekordsView  records={records} bodyWeight={bodyWeight} bwExercises={bwExercises} />}
       {tab === 'dash'     && <MonthlyReportView records={records} />}
       {tab === 'kalend'   && <KalendarzView records={records} navigation={navigation} bodyWeight={bodyWeight} bwExercises={bwExercises} />}
@@ -1323,6 +1418,37 @@ const styles = StyleSheet.create({
     flex: 1, padding: 8, backgroundColor: C.border, borderRadius: 8, alignItems: 'center',
   },
   wCardActionText: { color: C.sub, fontSize: 9.5, fontWeight: '700', letterSpacing: 1 },
+
+  // HistoriaDetail
+  detailBack: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8 },
+  detailBackText: { color: RED, fontSize: 13, fontWeight: '700' },
+  detailDate: { color: C.txt, fontSize: 18, fontWeight: '800', marginBottom: 12 },
+  detailStats: {
+    flexDirection: 'row', backgroundColor: C.card,
+    borderWidth: 1, borderColor: C.border, borderRadius: 14, marginBottom: 14,
+  },
+  detailStatItem:   { flex: 1, alignItems: 'center', paddingVertical: 12 },
+  detailStatBorder: { borderRightWidth: 1, borderRightColor: C.border },
+  detailStatVal:    { color: C.txt, fontSize: 14, fontWeight: '800', marginBottom: 2 },
+  detailStatLbl:    { color: C.muted, fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 },
+  detailCard: {
+    backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+    borderRadius: 12, padding: 12, marginBottom: 8,
+  },
+  detailCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  detailExName: { color: C.txt, fontSize: 13, fontWeight: '700', flex: 1 },
+  detailPRBadge: { backgroundColor: `${RED}20`, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  detailPRText:  { color: RED, fontSize: 9, fontWeight: '800' },
+  detailOrm:     { color: C.muted, fontSize: 10, alignSelf: 'center' },
+  detailSetRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingVertical: 5, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)',
+  },
+  detailSetNum:    { color: C.muted, fontSize: 10, width: 14, textAlign: 'center' },
+  detailSetWeight: { color: RED, fontSize: 12, fontWeight: '700', flex: 1 },
+  detailSetX:      { color: C.muted, fontSize: 11 },
+  detailSetReps:   { color: C.txt, fontSize: 12, fontWeight: '600' },
+  detailSetVol:    { color: C.muted, fontSize: 10, minWidth: 50, textAlign: 'right' },
 
   // RekordsView
   rekordyToolbar: {

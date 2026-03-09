@@ -84,6 +84,8 @@ export default function WorkoutScreen({ navigation, route }) {
   const [toast, setToast] = useState('');
   const [pickerVisible, setPickerVisible] = useState(false);
   const [activeField, setActiveField] = useState(null);
+  const [editingSet, setEditingSet] = useState(null); // { set, editWeight, editReps, activeField }
+  const [editActiveField, setEditActiveField] = useState(null);
 
   useEffect(() => {
     async function init() {
@@ -148,6 +150,50 @@ export default function WorkoutScreen({ navigation, route }) {
     setReps('');
     setActiveField(null);
     showToast('✅ Zapisano');
+  }
+
+  function deleteSet(id) {
+    Alert.alert('Usuń serię', 'Na pewno chcesz usunąć tę serię?', [
+      { text: 'Anuluj', style: 'cancel' },
+      { text: 'Usuń', style: 'destructive', onPress: async () => {
+        const newSession = sessionSets.filter(s => s.id !== id);
+        const newRecords = records.filter(r => r.id !== id);
+        setSessionSets(newSession);
+        setRecords(newRecords);
+        await saveRecords(newRecords);
+        showToast('🗑 Usunięto');
+      }},
+    ]);
+  }
+
+  function openEdit(set) {
+    setEditingSet({ set, editWeight: String(set.weight), editReps: String(set.reps) });
+    setEditActiveField(null);
+  }
+
+  function handleEditKey(k) {
+    const isW = editActiveField === 'weight';
+    const current = isW ? editingSet.editWeight : editingSet.editReps;
+    let next;
+    if (k === '⌫') next = current.slice(0, -1);
+    else if (k === '.' && (current.includes('.') || !isW)) return;
+    else if (current.length >= 6) return;
+    else next = current + k;
+    setEditingSet(prev => isW ? { ...prev, editWeight: next } : { ...prev, editReps: next });
+  }
+
+  async function saveEdit() {
+    const w = parseFloat(editingSet.editWeight);
+    const r = parseInt(editingSet.editReps);
+    if (!w || !r) return;
+    const updated = { ...editingSet.set, weight: w, reps: r };
+    const newSession = sessionSets.map(s => s.id === updated.id ? updated : s);
+    const newRecords = records.map(r2 => r2.id === updated.id ? updated : r2);
+    setSessionSets(newSession);
+    setRecords(newRecords);
+    await saveRecords(newRecords);
+    setEditingSet(null);
+    showToast('✅ Zaktualizowano');
   }
 
   function handleFinish() {
@@ -270,6 +316,14 @@ export default function WorkoutScreen({ navigation, route }) {
                       <Text style={styles.setX}>×</Text>
                       <Text style={styles.setReps}>{s.reps} <Text style={styles.setRepsLabel}>sets</Text></Text>
                     </View>
+                    <View style={styles.setActions}>
+                      <TouchableOpacity onPress={() => openEdit(s)} hitSlop={8} style={styles.setActionBtn}>
+                        <Feather name="edit-2" size={13} color={C.muted} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => deleteSet(s.id)} hitSlop={8} style={styles.setActionBtn}>
+                        <Feather name="trash-2" size={13} color="#f87171" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ))}
               </View>
@@ -303,6 +357,58 @@ export default function WorkoutScreen({ navigation, route }) {
                 </TouchableOpacity>
               )}
             />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal edycji serii */}
+      <Modal visible={!!editingSet} animationType="slide" transparent onRequestClose={() => setEditingSet(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edytuj serię</Text>
+              <TouchableOpacity onPress={() => setEditingSet(null)}>
+                <Text style={styles.modalClose}>Anuluj</Text>
+              </TouchableOpacity>
+            </View>
+            {editingSet && (
+              <View style={{ padding: 16 }}>
+                <Text style={styles.groupName}>{editingSet.set.exercise}</Text>
+                <View style={styles.row}>
+                  <View style={styles.inputWrap}>
+                    <Text style={styles.inputLabel}>Ciężar (kg)</Text>
+                    <TouchableOpacity
+                      style={[styles.input, editActiveField === 'weight' && styles.inputActive]}
+                      onPress={() => setEditActiveField('weight')} activeOpacity={0.8}
+                    >
+                      <Text style={[styles.inputVal, !editingSet.editWeight && styles.inputPlaceholder]}>
+                        {editingSet.editWeight || '0'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.inputWrap}>
+                    <Text style={styles.inputLabel}>Powtórzenia</Text>
+                    <TouchableOpacity
+                      style={[styles.input, editActiveField === 'reps' && styles.inputActive]}
+                      onPress={() => setEditActiveField('reps')} activeOpacity={0.8}
+                    >
+                      <Text style={[styles.inputVal, !editingSet.editReps && styles.inputPlaceholder]}>
+                        {editingSet.editReps || '0'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                {editActiveField && (
+                  <CustomKeypad showDot={editActiveField === 'weight'} onKey={handleEditKey} />
+                )}
+                <TouchableOpacity
+                  style={[styles.btn, { marginTop: 12 }]}
+                  onPress={() => { setEditActiveField(null); saveEdit(); }}
+                >
+                  <Text style={styles.btnText}>Zapisz zmiany</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -384,6 +490,8 @@ const styles = StyleSheet.create({
   setX:          { color: C.muted, fontSize: 12 },
   setReps:       { color: C.txt, fontSize: 14, fontWeight: '600' },
   setRepsLabel:  { color: C.muted, fontSize: 11, fontWeight: '400' },
+  setActions:    { flexDirection: 'row', gap: 4, marginLeft: 'auto' },
+  setActionBtn:  { padding: 4 },
 
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
   modalSheet:   { backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '75%' },
