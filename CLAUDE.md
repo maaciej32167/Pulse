@@ -7,6 +7,19 @@
 - Testy: `npx expo start --tunnel` → Expo Go na telefonie
 - PWA (`/Users/maciejgierlik/Documents/Aplikacje/sila/index.html`) działa niezależnie
 
+## Zasady struktury danych (AsyncStorage → Backend)
+
+**Każda zmiana dotykająca danych musi przestrzegać tych zasad — backend przyjdzie i migracja musi być bezbolesna.**
+
+- **ID** — zawsze UUID v4 (`generateUUID()` z `src/storage.js`), nigdy `Date.now()`
+- **Daty** — przechowuj jako ISO 8601: `"2026-03-09"` (pole `isoDate`). Pole `date` to tylko string wyświetlany użytkownikowi, nie jest bazą do obliczeń
+- **Klucze AsyncStorage** — prefix `pulse_` (nie `sila_`). Każdy nowy klucz dodawaj do `KEYS` w `src/storage.js`
+- **Nowe pola w rekordach** — dodaj je też do funkcji `migrateRecord()` w `src/storage.js` z sensownym defaultem
+- **Wersja schematu** — przy zmianie kształtu danych zwiększ `SCHEMA_VERSION` i napisz logikę migracji
+- **Denormalizacja offline** — pola jak `gymName` mogą być duplikowane w rekordzie (backend zsynchronizuje); ważne żeby był `gymId` jako klucz obcy
+- **Brak pól serwerowych lokalnie** — nie przechowuj `userId`, `createdAt`, `updatedAt` (te przyjdą z backendu); zostaw `userId: null` w profilu jako placeholder
+- **Nigdy nie usuwaj pól** z istniejących rekordów — tylko dodawaj nowe z defaultem. Stare dane muszą być migrowane, nie kasowane
+
 ## Git — kontrola wersji
 
 Projekt ma git (`/Users/maciejgierlik/Documents/Aplikacje/Pulse`).
@@ -75,6 +88,58 @@ Centralny przycisk **+ Log** — zawsze dostępny, jeden tap do dodania treningu
 | Siłownia | Abonament (Basic/Pro) | Profil, check-iny, grafik zajęć, statystyki, promocja |
 | Trener | Prowizja / abonament | Profil, kalendarz, rezerwacje, opinie |
 | Ćwiczący | Nic | Tracking, RPG, social feed |
+
+---
+
+## Wizja produktu — retencja między treningami
+
+> **Problem wszystkich aplikacji fitness:** są narzędziami. Otwierasz je żeby coś zalogować, zamykasz. Użytkownik który otwiera aplikację tylko przy treningu — odchodzi przy pierwszej dłuższej przerwie.
+> **Pytanie:** co sprawia że ludzie otwierają aplikację o 23:00 w piątek leżąc na kanapie?
+
+### 1. Twoja siłownia jako żywy organizm
+Aplikacja wie kto teraz trenuje w Twojej siłowni. Wie że Marek — 3 miejsca nad Tobą w rankingu — właśnie zrobił PR na klatce. Wie że nikt nie pobił rekordu wolumenu w tej siłowni od 4 miesięcy. Wie że dziś rano trenowały 3 osoby z Twojej listy znajomych.
+
+To jest rzecz która sprawia że otwierasz aplikację nie po to żeby coś zrobić, ale żeby sprawdzić co się dzieje. Zmienna nagroda — nie wiesz co znajdziesz, ale coś tam zawsze jest. Dokładnie jak Instagram czy Twitter.
+
+### 2. Rywal przypisany przez algorytm
+Nie lista rankingowa. Jeden konkretny człowiek wybrany specjalnie dla Ciebie — ktoś ~10–15% silniejszy, trenujący podobnie często, z podobnym stylem. Aplikacja mówi:
+
+> *"Twój rywal w tym miesiącu: Piotr R. Prowadzi o 2400 kg wolumenu. Ostatnio trenował 3 dni temu."*
+
+Ta jedna cyfra — „2400 kg do nadrobienia" — sprawia że myślisz o tym kiedy idziesz spać. Mechanizm rywalizacji 1-na-1 jest wielokrotnie silniejszy niż rankingi grupowe bo jest osobisty i widoczny. Szachy rozumieją to od 1500 lat. Strava rozumie to z segmentami. Nikt nie zrobił tego porządnie w treningu siłowym.
+
+### 3. Aplikacja ma pamięć i mówi o niej
+Większość aplikacji patrzy tylko do przodu. Pulse patrzy wstecz i opowiada historię.
+
+Przykłady:
+- Wchodzisz na trening → *„Rok temu o tej porze ważyłeś 5 kg więcej i zaczynałeś z 60 kg na klatce."*
+- Po treningu → *„To Twój 100. trening w tej siłowni."*
+- Notyfikacja w losowy wtorek → *„Dokładnie 6 miesięcy temu był Twój najgorszy tydzień — 0 treningów. Teraz jesteś na 18-dniowym streaku."*
+
+To nie jest gamifikacja. To narracja. Aplikacja staje się kroniką życia, nie tylko dziennikiem treningowym. Ludzie wracają po wspomnienia.
+
+### 4. Eventy sezonowe w siłowni
+3-miesięczne cykle z konkretnym wyzwaniem dla całej siłowni — nie globalnie, tylko dla Waszej siłowni.
+
+> *„Sezon zimowy: FitFabric Poznań. Wyzwanie: kto zbierze największy wolumen do 31 marca. Aktualnie prowadzi: Marek K."*
+
+Na końcu sezonu: tablica wyników, trwałe miejsce w historii siłowni, reset do nowego sezonu. Każdy sezon ma inny focus — raz wolumen, raz regularność, raz siła. Replikuje fenomen esportów i sezonów w grach (Fortnite, LoL). Ludzie grają bo *„sezon kończy się za 2 tygodnie i nie chcę spaść z 3. miejsca"*.
+
+### 5. Rzeczy których nie rozumiesz dopóki nie używasz
+Najtrudniejsze do zbudowania, najcenniejsze. Elementy które nie są wytłumaczone i które użytkownicy odkrywają przez używanie lub przez rozmowy z innymi.
+
+- Klasa postaci zmienia się bez ostrzeżenia jeśli styl treningu się zmieni. Pewnego dnia wchodzisz i ikona jest inna. Zaczynasz rozumieć dlaczego. Mówisz o tym znajomemu.
+- Poziom przestaje rosnąć przy pewnym progu i pojawia się coś co sugeruje że *„jest coś więcej"*. Żadnego wyjaśnienia. Po prostu znak.
+
+Tajemnica jest silnym mechanizmem retencji — mózg nie potrafi zostawić nierozwiązanych zagadek.
+
+### Wspólny mianownik
+Każdy z tych konceptów robi jedną rzecz: **sprawia że aplikacja ma wartość MIĘDZY treningami, nie tylko podczas nich.**
+
+- Rejestratorr → używasz 4× w tygodniu po 3 minuty
+- Żywy ekosystem społeczny skupiony na Twojej siłowni → sprawdzasz rano przy kawie
+
+Różnica między aplikacją a produktem który nie daje się odłożyć: czy generuje powody do otwarcia których użytkownik sam nie przewidywał.
 
 ---
 

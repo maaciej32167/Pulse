@@ -6,7 +6,8 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { loadExercises, loadRecords, saveRecords, loadBodyWeight, loadBWExercises } from '../src/storage';
-import { estimate1RM, round1, effectiveWeight, todayPL, generateId } from '../src/utils';
+import { estimate1RM, round1, effectiveWeight } from '../src/utils';
+import { generateUUID as generateId, isoDate, displayDate } from '../src/storage';
 
 // ─── design tokens ────────────────────────────────────────────────────────────
 
@@ -70,6 +71,7 @@ function CustomKeypad({ showDot, onKey }) {
 
 export default function WorkoutScreen({ navigation, route }) {
   const { gym, checkInTime } = route.params;
+  const workoutId = useRef(generateId()).current; // stable per session
   const { label: timerLabel } = useTimer(checkInTime);
 
   const [exercises, setExercises] = useState([]);
@@ -134,13 +136,34 @@ export default function WorkoutScreen({ navigation, route }) {
       Alert.alert('Błąd', 'Wybierz ćwiczenie i podaj ciężar oraz powtórzenia.');
       return;
     }
+
+    const eff    = bwExercises.has(selectedEx) ? bodyWeight + w : w;
+    const newOrm = estimate1RM(eff, r) || 0;
+
+    // Check PR against all existing records for this exercise
+    const prevBest = records
+      .filter(rec => rec.exercise === selectedEx)
+      .reduce((best, rec) => {
+        const effRec = bwExercises.has(rec.exercise) ? (rec.bodyWeightKg || bodyWeight) + Number(rec.weight) : Number(rec.weight);
+        return Math.max(best, estimate1RM(effRec, Number(rec.reps)) || 0);
+      }, 0);
+    const isPR = newOrm > 0 && newOrm > prevBest;
+
+    const now = Date.now();
+    const iso  = isoDate(now);
     const newRecord = {
-      id: generateId(),
-      exercise: selectedEx,
-      weight: w, reps: r,
-      date: todayPL(),
-      timestamp: Date.now(),
+      id:           generateId(),
+      workoutId,
+      exercise:     selectedEx,
+      weight:       w,
+      reps:         r,
+      isoDate:      iso,
+      date:         displayDate(iso),
+      timestamp:    now,
       bodyWeightKg: bodyWeight,
+      gymId:        gym?.id   || null,
+      gymName:      gym?.name || null,
+      isPR,
     };
     const updated = [...records, newRecord];
     setRecords(updated);
@@ -149,7 +172,7 @@ export default function WorkoutScreen({ navigation, route }) {
     setWeight('');
     setReps('');
     setActiveField(null);
-    showToast('✅ Zapisano');
+    showToast(isPR ? `🏆 Nowy PR! 1RM ≈ ${round1(newOrm)} kg` : '✅ Zapisano');
   }
 
   function deleteSet(id) {
@@ -305,7 +328,7 @@ export default function WorkoutScreen({ navigation, route }) {
               <View key={exercise} style={styles.group}>
                 <Text style={styles.groupName}>{exercise}</Text>
                 {sets.map((s, i) => (
-                  <View key={s.id} style={styles.setRow}>
+                  <View key={s.id} style={[styles.setRow, s.isPR && styles.setRowPR]}>
                     <Text style={styles.setNum}>{i + 1}</Text>
                     <View style={styles.setWeightReps}>
                       <Text style={styles.setWeight}>
@@ -317,6 +340,11 @@ export default function WorkoutScreen({ navigation, route }) {
                       <Text style={styles.setReps}>{s.reps} <Text style={styles.setRepsLabel}>sets</Text></Text>
                     </View>
                     <View style={styles.setActions}>
+                      {s.isPR && (
+                        <View style={styles.prMedal}>
+                          <Text style={styles.prMedalText}>PR</Text>
+                        </View>
+                      )}
                       <TouchableOpacity onPress={() => openEdit(s)} hitSlop={8} style={styles.setActionBtn}>
                         <Feather name="edit-2" size={13} color={C.muted} />
                       </TouchableOpacity>
@@ -484,6 +512,19 @@ const styles = StyleSheet.create({
   group:     { marginTop: 12 },
   groupName: { color: C.txt, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
   setRow:        { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)' },
+  setRowPR:      { backgroundColor: 'rgba(255,215,0,0.06)' },
+  prMedal: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: '#FFD700',
+    borderWidth: 2, borderColor: '#B8860B',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#FFD700', shadowOpacity: 0.6, shadowRadius: 4, elevation: 4,
+  },
+  prMedalText: {
+    color: '#000', fontSize: 9, fontWeight: '900',
+    fontStyle: 'italic', letterSpacing: 0.8,
+    fontFamily: 'Georgia',
+  },
   setNum:        { color: C.muted, fontSize: 12, width: 18, textAlign: 'center' },
   setWeightReps: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   setWeight:     { color: C.accent, fontSize: 14, fontWeight: '700' },
