@@ -427,7 +427,7 @@ function StatsView({ records, ironPath }) {
   const maxVal = Math.max(...chartData.map(d => d[metric]), 1);
   const BAR_H  = 80;
   const fmtBarVal = (d) => {
-    if (metric === 'volume')   return d.volume >= 1000 ? `${(d.volume / 1000).toFixed(0)}k` : `${Math.round(d.volume)}`;
+    if (metric === 'volume')   return `${Math.round(d.volume).toLocaleString('pl-PL')}`;
     if (metric === 'trainings')return `${d.trainings}`;
     return fmtDurationShort(d.duration);
   };
@@ -498,7 +498,7 @@ function StatsView({ records, ironPath }) {
         {[
           [avgDur > 0 ? fmtDuration(avgDur) : '—',                                                'Śr. czas sesji'],
           [`${mWorkouts}`,                                                                          'Treningi (mies.)'],
-          [mVolume >= 1000 ? `${Math.round(mVolume / 1000)}k kg` : `${Math.round(mVolume)} kg`,   'Wolumen (mies.)'],
+          [`${Math.round(mVolume).toLocaleString('pl-PL')} kg`,                                    'Wolumen (mies.)'],
           [bestStr > 0 ? `${bestStr} dni` : '—',                                                   'Najdłuższy streak'],
         ].map(([val, lbl]) => (
           <View key={lbl} style={styles.statCard2}>
@@ -1187,7 +1187,7 @@ function MonthlyReportView({ records }) {
   const maxVal = Math.max(...activeChartData.map(d => d.value), 1);
   const BAR_H  = 80;
   function fmtBarVal(v) {
-    if (metric === 'volume')   return v >= 1000 ? `${Math.round(v/1000)}k` : `${Math.round(v)}`;
+    if (metric === 'volume')   return `${Math.round(v).toLocaleString('pl-PL')}`;
     if (metric === 'duration') return fmtDurationShort(v);
     return `${v}`;
   }

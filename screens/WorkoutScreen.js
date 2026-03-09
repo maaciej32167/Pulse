@@ -287,9 +287,9 @@ export default function WorkoutScreen({ navigation, route }) {
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
-        {/* Dodaj serię */}
+        {/* Dodaj ćwiczenie */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Dodaj serię</Text>
+          <Text style={styles.cardTitle}>Dodaj ćwiczenie</Text>
 
           <TouchableOpacity style={styles.picker} onPress={() => setPickerVisible(true)}>
             <Text style={styles.pickerText}>{selectedEx || 'Wybierz ćwiczenie'}</Text>
