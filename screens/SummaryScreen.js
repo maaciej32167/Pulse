@@ -36,10 +36,10 @@ function formatTime(ts) {
 function StatBox({ icon, value, label, color }) {
   return (
     <View style={styles.statBox}>
-      <View style={[styles.statIcon, { backgroundColor: (color || C.coral) + '18' }]}>
-        <Feather name={icon} size={16} color={color || C.coral} />
+      <View style={styles.statRow}>
+        <Feather name={icon} size={14} color={color || C.coral} />
+        <Text style={[styles.statValue, { color: color || C.coral }]}>{value}</Text>
       </View>
-      <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
@@ -86,7 +86,7 @@ export default function SummaryScreen({ navigation, route }) {
           </View>
           <Text style={styles.heroTitle}>TRENING UKOŃCZONY</Text>
           <View style={styles.heroMeta}>
-            <Feather name="map-pin" size={12} color={C.muted} />
+            <Text style={styles.heroPin}>📍</Text>
             <Text style={styles.heroGym}>{gym.name}</Text>
             <View style={styles.heroDot} />
             <Text style={styles.heroTime}>{formatTime(startTime)} – {formatTime(endTime)}</Text>
@@ -173,19 +173,20 @@ const styles = StyleSheet.create({
   },
   heroTitle: { color: C.txt, fontSize: 22, fontWeight: '900', letterSpacing: 4, textTransform: 'uppercase' },
   heroMeta:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
-  heroGym:   { color: C.muted, fontSize: 12 },
-  heroDot:   { width: 3, height: 3, borderRadius: 1.5, backgroundColor: C.muted, opacity: 0.5 },
-  heroTime:  { color: C.muted, fontSize: 12 },
+  heroPin:   { fontSize: 12 },
+  heroGym:   { color: C.txt, fontSize: 14, fontWeight: '700' },
+  heroDot:   { width: 3, height: 3, borderRadius: 1.5, backgroundColor: '#6b7f93', opacity: 0.8 },
+  heroTime:  { color: '#99aabb', fontSize: 13 },
 
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   statBox: {
     flex: 1, minWidth: '45%',
     backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
-    borderRadius: 14, padding: 14, gap: 6,
+    borderRadius: 12, padding: 11, gap: 4,
   },
-  statIcon:  { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  statValue: { color: C.txt, fontSize: 20, fontWeight: '800' },
-  statLabel: { color: C.muted, fontSize: 11 },
+  statRow:   { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  statValue: { fontSize: 17, fontWeight: '800' },
+  statLabel: { color: C.muted, fontSize: 10, letterSpacing: 0.3 },
 
   card: {
     backgroundColor: C.card, borderWidth: 1, borderColor: C.border,

@@ -381,14 +381,22 @@ function ProfileHero({ profile, records, onEditPress }) {
 
 function StatsView({ records, ironPath }) {
   const [timeframe, setTimeframe] = useState('week');
-  const [metric,    setMetric]    = useState('volume');
+  const [metric,    setMetric]    = useState('duration');
   const dayMap = useMemo(() => groupByDay(records), [records]);
 
   const chartData = useMemo(() => {
     const now = new Date();
     if (timeframe === 'week') {
+      // Poniedziałek bieżącego tygodnia (Pn=0 … Nd=6)
+      const today = new Date();
+      const daysFromMonday = (today.getDay() + 6) % 7; // 0=Pn, 6=Nd
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - daysFromMonday);
+      monday.setHours(0, 0, 0, 0);
+
       return DAYS_SHORT.map((label, i) => {
-        const d = new Date(); d.setDate(d.getDate() - (6 - i));
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
         const ts = startOfDay(d.getTime());
         const recs = dayMap.get(ts) || [];
         return { label, volume: getDayVolume(recs), trainings: recs.length > 0 ? 1 : 0, duration: getDayDurationMs(recs) };
@@ -1106,24 +1114,35 @@ function MonthlyReportView({ records }) {
     return { workouts, duration, volume, sets };
   }, [dayMap, mStart, mEnd]);
 
-  // ── Weekly chart data (chunks of 7 days: 1-7, 8-14, 15-21, 22-28, 29-end)
+  // ── Weekly chart data — kalendarzowe tygodnie Pn–Pt w danym miesiącu
   const chartData = useMemo(() => {
     const weeks = [];
-    for (let start = 1; start <= daysInMon; start += 7) {
-      const end = Math.min(start + 6, daysInMon);
+    // Znajdź poniedziałek tygodnia zawierającego 1. dzień miesiąca
+    const firstDay = new Date(year, month, 1);
+    const daysFromMonday = (firstDay.getDay() + 6) % 7; // 0=Pn
+    const weekStart = new Date(year, month, 1 - daysFromMonday);
+
+    for (let w = new Date(weekStart); w.getMonth() <= month && w.getFullYear() <= year; w.setDate(w.getDate() + 7)) {
+      // Pn–Pt tego tygodnia (pomijamy Sb i Nd)
       let val = 0;
-      for (let d = start; d <= end; d++) {
-        const ts   = startOfDay(new Date(year, month, d).getTime());
+      let pn = null, pt = null;
+      for (let offset = 0; offset < 7; offset++) {        // Pn=0 … Nd=6
+        const d = new Date(w);
+        d.setDate(w.getDate() + offset);
+        if (d.getMonth() !== month) continue;             // poza miesiącem — pomiń
+        if (!pn) pn = d.getDate();
+        pt = d.getDate();
+        const ts   = startOfDay(d.getTime());
         const recs = dayMap.get(ts) || [];
         if      (metric === 'volume')   val += getDayVolume(recs);
         else if (metric === 'duration') val += getDayDurationMs(recs);
         else if (metric === 'workouts') val += recs.length > 0 ? 1 : 0;
-        else if (metric === 'sets')     val += recs.length;
+        else                            val += recs.length;
       }
-      weeks.push({ label: `${start}–${end}`, value: val });
+      if (pn !== null) weeks.push({ label: `${pn}–${pt}`, value: val });
     }
     return weeks;
-  }, [dayMap, year, month, daysInMon, metric]);
+  }, [dayMap, year, month, metric]);
 
 
   // ── Navigation
