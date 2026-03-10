@@ -377,7 +377,7 @@ export default function WorkoutScreen({ navigation, route }) {
                     <View style={styles.setActions}>
                       {s.isPR && (
                         <View style={styles.prMedal}>
-                          <Text style={styles.prMedalText}>PR</Text>
+                          <Text style={styles.prMedalText}>🏆</Text>
                         </View>
                       )}
                       <TouchableOpacity onPress={() => openEdit(s)} hitSlop={8} style={styles.setActionBtn}>
@@ -561,16 +561,12 @@ const styles = StyleSheet.create({
   setRow:        { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)' },
   setRowPR:      { backgroundColor: 'rgba(255,215,0,0.06)' },
   prMedal: {
-    width: 30, height: 30, borderRadius: 15,
+    width: 26, height: 26, borderRadius: 13,
     backgroundColor: '#FFD700',
-    borderWidth: 2, borderColor: '#B8860B',
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#FFD700', shadowOpacity: 0.6, shadowRadius: 4, elevation: 4,
   },
   prMedalText: {
-    color: '#000', fontSize: 9, fontWeight: '900',
-    fontStyle: 'italic', letterSpacing: 0.8,
-    fontFamily: 'Georgia',
+    fontSize: 13,
   },
   setNum:        { color: C.muted, fontSize: 12, width: 18, textAlign: 'center' },
   setWeightReps: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
