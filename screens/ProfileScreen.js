@@ -379,7 +379,7 @@ function ProfileHero({ profile, records, onEditPress }) {
 
 // ── StatsView ─────────────────────────────────────────────────────────────────
 
-function StatsView({ records, ironPath }) {
+function StatsView({ records }) {
   const [timeframe, setTimeframe] = useState('week');
   const [metric,    setMetric]    = useState('duration');
   const dayMap = useMemo(() => groupByDay(records), [records]);
@@ -414,6 +414,22 @@ function StatsView({ records, ironPath }) {
     });
   }, [timeframe, dayMap]);
 
+  // Rekordy z wybranego okresu (dla MuscleFocus)
+  const periodRecords = useMemo(() => {
+    const now = new Date();
+    if (timeframe === 'week') {
+      const daysFromMonday = (now.getDay() + 6) % 7;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - daysFromMonday);
+      monday.setHours(0, 0, 0, 0);
+      const sunday = monday.getTime() + 6 * 86400000 + 86399999;
+      return records.filter(r => resolveTs(r) >= monday.getTime() && resolveTs(r) <= sunday);
+    }
+    const mStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const mEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
+    return records.filter(r => resolveTs(r) >= mStart && resolveTs(r) <= mEnd);
+  }, [timeframe, records]);
+
   // Podsumowanie zsumowane z chartData (reaguje na filtr tydzień/miesiące)
   const periodWorkouts = chartData.reduce((s, d) => s + (d.trainings || 0), 0);
   const periodVolume   = chartData.reduce((s, d) => s + (d.volume   || 0), 0);
@@ -436,9 +452,6 @@ function StatsView({ records, ironPath }) {
 
   return (
     <ScrollView contentContainerStyle={styles.padded} showsVerticalScrollIndicator={false}>
-      {/* Iron Path */}
-      <IronPath data={ironPath} />
-
       {/* Timeframe */}
       <View style={styles.tfRow}>
         {[['week', 'TYDZIEŃ'], ['month', 'MIESIĄCE']].map(([id, lbl]) => (
@@ -505,6 +518,8 @@ function StatsView({ records, ironPath }) {
           </View>
         ))}
       </View>
+
+      <MuscleFocus records={periodRecords} />
 
       <View style={{ height: 32 }} />
     </ScrollView>
@@ -1025,6 +1040,55 @@ function MuscleDistribution({ records }) {
   );
 }
 
+// ── MuscleFocus ───────────────────────────────────────────────────────────────
+
+function MuscleFocus({ records }) {
+  const data  = useMemo(() => getMuscleData(records), [records]);
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (!data.length) return null;
+
+  return (
+    <View style={styles.mfCard}>
+      <Text style={styles.mfTitle}>TWÓJ FOKUS</Text>
+
+      {/* Segmentowany pasek */}
+      <View style={styles.mfBar}>
+        {data.map(d => (
+          <View
+            key={d.name}
+            style={[styles.mfBarSeg, { flex: d.value, backgroundColor: d.color }]}
+          />
+        ))}
+      </View>
+
+      {/* Siatka kart 2×N */}
+      <View style={styles.mfGrid}>
+        {data.map((d, i) => {
+          const pct = Math.round(d.value / total * 100);
+          const isTop = i === 0;
+          return (
+            <View key={d.name} style={[styles.mfMuscleCard, { borderLeftColor: d.color }, isTop && styles.mfMuscleCardTop]}>
+              <View style={styles.mfMuscleRow}>
+                <Text style={[styles.mfMusclePct, { color: d.color }]}>{pct}%</Text>
+                {isTop && (
+                  <View style={[styles.mfTopBadge, { backgroundColor: d.color + '22' }]}>
+                    <Text style={[styles.mfTopBadgeText, { color: d.color }]}>TOP</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.mfMuscleName}>{d.name}</Text>
+              <View style={styles.mfMiniTrack}>
+                <View style={[styles.mfMiniFill, { width: `${pct}%`, backgroundColor: d.color }]} />
+              </View>
+              <Text style={styles.mfMuscleSets}>{d.value} serii</Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 // ── ReportCalendar ────────────────────────────────────────────────────────────
 
 function ReportCalendar({ dayMap, year, month, daysInMon, stats }) {
@@ -1513,8 +1577,6 @@ export default function ProfileScreen({ navigation }) {
     setEditVisible(false);
   }
 
-  const dayMap    = useMemo(() => groupByDay(records), [records]);
-  const ironPath  = useMemo(() => calcIronPath(records, dayMap, bodyWeight), [records, dayMap, bodyWeight]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -1549,7 +1611,7 @@ export default function ProfileScreen({ navigation }) {
         </ScrollView>
       </View>
 
-      {tab === 'stats'    && <StatsView    records={records} ironPath={ironPath} />}
+      {tab === 'stats'    && <StatsView    records={records} />}
       {tab === 'historia' && <HistoriaView records={records} bodyWeight={bodyWeight} bwExercises={bwExercises} />}
       {tab === 'rekordy'  && <RekordsView  records={records} bodyWeight={bodyWeight} bwExercises={bwExercises} />}
       {tab === 'dash'     && <MonthlyReportView records={records} />}
@@ -1841,6 +1903,23 @@ const styles = StyleSheet.create({
   pickerMonthCellActive:  { backgroundColor: RED, borderColor: RED },
   pickerMonthText:        { color: C.sub, fontSize: 12, fontWeight: '700' },
   pickerMonthTextActive:  { color: '#fff' },
+  // MuscleFocus
+  mfCard:          { backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 16, marginTop: 12 },
+  mfTitle:         { color: C.muted, fontSize: 10, fontWeight: '800', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 12 },
+  mfBar:           { flexDirection: 'row', height: 10, borderRadius: 6, overflow: 'hidden', marginBottom: 16, gap: 2 },
+  mfBarSeg:        { borderRadius: 3 },
+  mfGrid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  mfMuscleCard:    { flex: 1, minWidth: '45%', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 10, borderWidth: 1, borderColor: C.border, borderLeftWidth: 3, padding: 10 },
+  mfMuscleCardTop: { backgroundColor: 'rgba(255,255,255,0.06)' },
+  mfMuscleRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
+  mfMusclePct:     { fontSize: 22, fontWeight: '900', lineHeight: 26 },
+  mfTopBadge:      { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+  mfTopBadgeText:  { fontSize: 8, fontWeight: '800', letterSpacing: 0.5 },
+  mfMuscleName:    { color: C.txt, fontSize: 12, fontWeight: '700', marginBottom: 6 },
+  mfMiniTrack:     { height: 3, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, marginBottom: 5, overflow: 'hidden' },
+  mfMiniFill:      { height: '100%', borderRadius: 2 },
+  mfMuscleSets:    { color: C.muted, fontSize: 10 },
+
   muscleCard: {
     backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border,
     padding: 14, marginTop: 12,
