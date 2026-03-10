@@ -202,6 +202,39 @@ Różnica między aplikacją a produktem który nie daje się odłożyć: czy ge
 
 ---
 
+## B2B — model danych publicznych vs właścicielskich
+
+### Problem
+Publiczny profil siłowni pokazuje: kto teraz trenuje, stali bywalcy, obłożenie, statystyki.
+Jeśli właściciel widzi to samo co każdy użytkownik — nie ma powodu płacić.
+
+### Decyzja architektoniczna
+Część danych **musi być dostępna tylko dla zweryfikowanego właściciela**:
+
+| Dane | Publiczny profil | Dashboard właściciela |
+|---|---|---|
+| Kto teraz trenuje | ✅ | ✅ |
+| Stali bywalcy (ranking) | ✅ | ✅ |
+| Obłożenie w ciągu dnia | ✅ (dziś) | ✅ + historia / trendy |
+| Statystyki zbiorcze | ✅ (liczby) | ✅ + wykresy miesiąc/rok |
+| Retencja i odpływ | ❌ | ✅ — kto przestał przychodzić i kiedy |
+| Nowi vs powracający | ❌ | ✅ — miesięczny wykres |
+| Ogłoszenia push do bywalców | ❌ | ✅ |
+| Wyzwania sezonowe (tworzenie) | ❌ | ✅ |
+| Badge "Oficjalny profil" | widoczny | edytowalny |
+| Zdjęcia / opis / cennik / godziny | widoczne | edytowalne |
+| Priorytet w Discover | ❌ | ✅ |
+
+### Kluczowa wartość której nie ma nigdzie indziej
+**Retencja** — właściciel widzi ilu bywalców przestało przychodzić w ostatnich 30/60/90 dniach.
+Żaden CRM siłowni tego nie liczy automatycznie bo nie wie że klient ćwiczył — Pulse wie.
+
+### Komunikacja push
+Właściciel bez Pulse nie ma kanału dotarcia do aktywnych klientów poza Instagramem.
+Pulse daje listę realnych bywalców (nie subskrybentów newslettera) + możliwość wysłania ogłoszenia.
+
+---
+
 ## Uruchomienie lokalne
 
 ```bash
@@ -292,31 +325,90 @@ const C = {
 ## TODO — najbliższe kroki (Faza 1)
 
 ### Profil użytkownika
-- [ ] Waga ciała — edytowalny input + historia pomiarów
-- [ ] Statystyki: treningi, wolumen, PR w tym roku
-- [ ] Zakładka REKORDY — tabela PR z datami, wykres progresu per ćwiczenie
-- [ ] Zakładka STATS — wykresy wolumenu tygodniowego/miesięcznego
-- [ ] Poziom RPG i klasa postaci (pasek XP)
+- [x] Waga ciała — edytowalny input w EditProfileModal (pole `weight`)
+- [x] Statystyki: treningi, wolumen, streak, śr. czas — zakładka STATS w ProfileScreen
+- [x] Zakładka REKORDY (RekordsView) — tabela serii z filtrem per ćwiczenie, sortowanie wg ciężaru/powt./1RM/daty
+- [x] Zakładka STATS — wykres słupkowy tydzień/6 mies. z metrykami CZAS/TRENINGI/WOLUMEN
+- [x] Poziom RPG i klasa postaci — calcXPLevel(), getRPGClass(), badge poziomu na avatarze
+- [x] Iron Path radar chart — 5 osi: SIŁA / WOLUMEN / REGULARNOŚĆ / RÓŻNORODNOŚĆ / PROGRES
 
 ### System RPG (podstawy)
-- [ ] Obliczanie XP za trening
-- [ ] Pasek XP i poziom na profilu
-- [ ] Achievementy (pierwsze 5)
+- [x] Obliczanie XP za trening (calcXPLevel — 10 XP/seria, sqrt level)
+- [x] Pasek XP i poziom na profilu (badge na avatarze)
+- [ ] Achievementy (pierwsze 5) — nie zaimplementowane
 
-### Ćwiczenia
-- [ ] Lista alfabetyczna z wyszukiwarką
+### Historia
+- [x] HistoryScreen: zakładki Treningi / Serie / Top — pełna funkcjonalność z edycją i usuwaniem
+- [x] WorkoutDetailScreen — szczegóły treningu per seria
+- [ ] Wykres 1RM w czasie dla wybranego ćwiczenia — brak
+
+### Ćwiczenia (ExercisesScreen)
+- [ ] Lista alfabetyczna z wyszukiwarką — placeholder "Wkrótce"
 - [ ] Dodawanie / usuwanie ćwiczenia
 - [ ] Oznaczanie jako BW (masa ciała)
 
-### Historia
-- [ ] Wykres 1RM w czasie dla wybranego ćwiczenia
+### Plan (PlanScreen)
+- [ ] Cały ekran — placeholder "Wkrótce"
 
 ### App-wide
-- [ ] Ekran ładowania / splash screen
-- [ ] Obsługa pustego stanu (brak rekordów)
+- [ ] Ekran ładowania / splash screen — brak dedykowanego SplashScreen (jest ActivityIndicator w App.js)
+- [ ] Check-in: siłownie są mockiem (hardcoded GYMS w LogScreen), brak prawdziwej mapy/GPS
 
 ### Check-in / Check-out
-- [ ] **Automatyczny check-out po zakończeniu treningu** — do rozważenia: po zapisaniu podsumowania treningu w StartScreen → auto check-out z siłowni (jeśli użytkownik był zameldowany)
+- [ ] Prawdziwa lista siłowni (GPS / wyszukiwarka API) — teraz mockowane
+- [ ] Automatyczny check-out po zakończeniu treningu
+
+---
+
+## Backend — co to znaczy dla Pulse
+
+### Obecny stan
+Aplikacja działa **tylko lokalnie** — dane są w AsyncStorage na telefonie. Nikt inny nie widzi Twoich treningów, Ty nie widzisz cudzych.
+
+### Co daje backend
+Serwer w internecie który:
+- przechowuje dane wszystkich użytkowników w bazie danych
+- pozwala się logować (email / Apple ID / Google)
+- synchronizuje dane między urządzeniami
+- umożliwia komunikację między użytkownikami (feed, rankingi, rywal)
+
+### Co konkretnie trzeba zbudować
+
+| Element | Opis |
+|---|---|
+| **Autentykacja** | Rejestracja i logowanie — bez tego nie ma kont, nie ma social |
+| **Baza danych** | Rekordy, profile, siłownie na serwerze — proponowany stack: **Supabase** (PostgreSQL + auth, darmowy tier) |
+| **Synchronizacja** | AsyncStorage → upload na serwer po każdym treningu. Offline działa, sync gdy internet |
+| **Social API** | Feed znajomych, rankingi siłowni, rywal algorytmiczny |
+| **Sesje treningowe (live)** | Realtime "Teraz tutaj" w GymScreen — patrz niżej |
+
+### Sesje treningowe — flow z backendem
+
+```
+LogScreen → wybór siłowni
+  ↓
+WorkoutScreen start → POST /sessions { gymId, userId, startedAt }
+  ↓
+WorkoutScreen → PATCH /sessions/:id { currentExercise }
+  (przy każdej zmianie ćwiczenia)
+  ↓
+GymScreen → GET /gyms/:id/live  (polling ~30s lub WebSocket)
+  → zwraca aktywne sesje → sekcja "Teraz tutaj" z migającą kropką
+  ↓
+SummaryScreen (zakończenie) → PATCH /sessions/:id { endedAt }
+  → sesja znika z "Teraz tutaj"
+  → wolumen/czas/ćwiczenia trafiają do statystyk siłowni
+```
+
+**Struktura danych jest już gotowa** — rekordy mają `gymId`, `gymName`, `workoutId`. Brakuje tylko encji sesji po stronie backendu.
+
+### Decyzje do podjęcia przed budową
+- Supabase vs Firebase vs własny serwer?
+- Czy najpierw MVP bez backendu (tylko local) i publikacja w App Store?
+- Czy szukać współpracownika backendowego?
+
+### Ważne
+To największy skok w projekcie — tygodnie pracy, nie dni. Obecna struktura danych (`src/storage.js`, UUID, isoDate) jest już przygotowana pod migrację do backendu.
 
 ---
 
