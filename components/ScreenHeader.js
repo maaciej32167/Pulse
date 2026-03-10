@@ -30,15 +30,7 @@ export default function ScreenHeader({ navigation, icon, label, color }) {
         <View style={[styles.iconWrap, { backgroundColor: color + '18', borderColor: color + '55' }]}>
           <Feather name={icon} size={20} color={color} />
         </View>
-        <View style={styles.labelRow}>
-          <Text style={[styles.label, { color }]}>{label}</Text>
-          <Feather
-            name={open ? 'chevron-up' : 'chevron-down'}
-            size={12}
-            color={color}
-            style={{ marginLeft: 4, opacity: 0.7 }}
-          />
-        </View>
+        <Text style={[styles.label, { color }]}>{label}</Text>
       </TouchableOpacity>
 
       {/* Spacer */}
@@ -93,10 +85,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   label: {
     fontSize: 13,
