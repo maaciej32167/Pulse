@@ -683,7 +683,7 @@ function HistoriaDetail({ day, dayRecs, allRecords, bodyWeight, bwExercises, dat
               return (
                 <View key={s.id || i} style={[styles.detailSetRow, isSetPR && styles.detailSetRowPR]}>
                   <Text style={styles.detailSetNum}>{i + 1}</Text>
-                  <Text style={[styles.detailSetWeight, isSetPR && { color: C.txt }]}>
+                  <Text style={styles.detailSetWeight}>
                     {weightStr}<Text style={styles.detailSetX}> × </Text>
                     <Text style={styles.detailSetReps}>{s.reps} reps</Text>
                   </Text>
