@@ -414,14 +414,11 @@ function StatsView({ records, ironPath }) {
     });
   }, [timeframe, dayMap]);
 
-  const now = new Date();
-  const mStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const mEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
-  let mWorkouts = 0, mVolume = 0, mDuration = 0;
-  for (const [day, recs] of dayMap) {
-    if (day >= mStart && day <= mEnd) { mWorkouts++; mVolume += getDayVolume(recs); mDuration += getDayDurationMs(recs); }
-  }
-  const avgDur   = mWorkouts > 0 ? mDuration / mWorkouts : 0;
+  // Podsumowanie zsumowane z chartData (reaguje na filtr tydzień/miesiące)
+  const periodWorkouts = chartData.reduce((s, d) => s + (d.trainings || 0), 0);
+  const periodVolume   = chartData.reduce((s, d) => s + (d.volume   || 0), 0);
+  const periodDuration = chartData.reduce((s, d) => s + (d.duration || 0), 0);
+  const avgDur   = periodWorkouts > 0 ? periodDuration / periodWorkouts : 0;
   const bestStr  = calcBestStreak(dayMap);
 
   const maxVal = Math.max(...chartData.map(d => d[metric]), 1);
@@ -496,13 +493,16 @@ function StatsView({ records, ironPath }) {
       {/* Stat cards 2×2 */}
       <View style={styles.statGrid2}>
         {[
-          [avgDur > 0 ? fmtDuration(avgDur) : '—',                                                'Śr. czas sesji'],
-          [`${mWorkouts}`,                                                                          'Treningi (mies.)'],
-          [`${Math.round(mVolume).toLocaleString('pl-PL')} kg`,                                    'Wolumen (mies.)'],
-          [bestStr > 0 ? `${bestStr} dni` : '—',                                                   'Najdłuższy streak'],
-        ].map(([val, lbl]) => (
+          { val: avgDur > 0 ? fmtDuration(avgDur) : '—',                              lbl: 'Śr. czas sesji',  icon: 'clock',        color: '#00F5FF' },
+          { val: `${periodWorkouts}`,                                                   lbl: 'Treningi',        icon: 'activity',     color: RED       },
+          { val: `${Math.round(periodVolume).toLocaleString('pl-PL')} kg`,             lbl: 'Wolumen',         icon: 'trending-up',  color: C.gold    },
+          { val: bestStr > 0 ? `${bestStr} dni` : '—',                                 lbl: 'Najdłuższy streak', icon: 'zap',        color: '#a78bfa' },
+        ].map(({ val, lbl, icon, color }) => (
           <View key={lbl} style={styles.statCard2}>
-            <Text style={styles.statCard2Val}>{val}</Text>
+            <View style={[styles.statCard2IconRow, { justifyContent: 'flex-start', gap: 7 }]}>
+              <Feather name={icon} size={14} color={color} />
+              <Text style={[styles.statCard2Val, { color }]}>{val}</Text>
+            </View>
             <Text style={styles.statCard2Lbl}>{lbl}</Text>
           </View>
         ))}
@@ -648,16 +648,19 @@ function HistoriaDetail({ day, dayRecs, allRecords, bodyWeight, bwExercises, dat
       </TouchableOpacity>
       <Text style={styles.detailDate}>{date}</Text>
 
-      {/* Stat row */}
+      {/* Stat grid */}
       <View style={styles.detailStats}>
         {[
-          [duration != null ? fmtDuration(duration) : '—', 'Czas'],
-          [groups.length,                                   'Ćwiczenia'],
-          [dayRecs.length,                                  'Sets'],
-          [`${Math.round(totalVolume)} kg`,                 'Volume'],
-        ].map(([v, l], i, arr) => (
-          <View key={l} style={[styles.detailStatItem, i < arr.length - 1 && styles.detailStatBorder]}>
-            <Text style={styles.detailStatVal}>{v}</Text>
+          { v: duration != null ? fmtDuration(duration) : '—', l: 'Czas',      icon: 'clock',        color: '#00F5FF' },
+          { v: groups.length,                                   l: 'Ćwiczenia', icon: 'bar-chart-2',  color: RED      },
+          { v: dayRecs.length,                                  l: 'Serie',     icon: 'layers',       color: '#a78bfa'},
+          { v: `${Math.round(totalVolume)} kg`,                 l: 'Wolumen',   icon: 'trending-up',  color: C.gold   },
+        ].map(({ v, l, icon, color }) => (
+          <View key={l} style={styles.detailStatItem}>
+            <View style={styles.detailStatIconRow}>
+              <Feather name={icon} size={14} color={color} />
+              <Text style={[styles.detailStatVal, { color }]}>{v}</Text>
+            </View>
             <Text style={styles.detailStatLbl}>{l}</Text>
           </View>
         ))}
@@ -1207,10 +1210,10 @@ function MonthlyReportView({ records }) {
   // ── Stat card definitions
   const activeStats = mode === 'year' ? yearStats : stats;
   const STAT_CARDS = [
-    { id: 'workouts', label: 'TRENINGI', value: `${activeStats.workouts}` },
-    { id: 'duration', label: 'CZAS',     value: activeStats.duration > 0 ? fmtDuration(activeStats.duration) : '—' },
-    { id: 'volume',   label: 'WOLUMEN',  value: `${Math.round(activeStats.volume).toLocaleString('pl-PL')} kg` },
-    { id: 'sets',     label: 'SERIE',    value: `${activeStats.sets}` },
+    { id: 'workouts', label: 'Treningi', value: `${activeStats.workouts}`,                                          icon: 'activity',    color: RED         },
+    { id: 'duration', label: 'Czas',     value: activeStats.duration > 0 ? fmtDuration(activeStats.duration) : '—', icon: 'clock',       color: '#00F5FF'   },
+    { id: 'volume',   label: 'Wolumen',  value: `${Math.round(activeStats.volume).toLocaleString('pl-PL')} kg`,      icon: 'trending-up', color: C.gold      },
+    { id: 'sets',     label: 'Serie',    value: `${activeStats.sets}`,                                               icon: 'layers',      color: '#a78bfa'   },
   ];
 
   return (
@@ -1299,18 +1302,23 @@ function MonthlyReportView({ records }) {
 
       {/* 4 stat cards — tap to switch chart */}
       <View style={styles.statGrid2}>
-        {STAT_CARDS.map(s => (
-          <TouchableOpacity
-            key={s.id}
-            style={[styles.statCard2, metric === s.id && styles.statCard2Active]}
-            onPress={() => setMetric(s.id)}
-            activeOpacity={0.75}
-          >
-            <Text style={[styles.statCard2Val, metric === s.id && { color: RED }]}>{s.value}</Text>
-            <Text style={[styles.statCard2Lbl, metric === s.id && { color: RED }]}>{s.label}</Text>
-            {metric === s.id && <View style={styles.statCard2Dot} />}
-          </TouchableOpacity>
-        ))}
+        {STAT_CARDS.map(s => {
+          const active = metric === s.id;
+          return (
+            <TouchableOpacity
+              key={s.id}
+              style={[styles.statCard2, active && { borderColor: s.color + '66', backgroundColor: s.color + '0D' }]}
+              onPress={() => setMetric(s.id)}
+              activeOpacity={0.75}
+            >
+                <View style={[styles.statCard2IconRow, { justifyContent: 'flex-start', gap: 7 }]}>
+                <Feather name={s.icon} size={14} color={active ? s.color : C.muted} />
+                <Text style={[styles.statCard2Val, { color: active ? s.color : C.txt }]}>{s.value}</Text>
+              </View>
+              <Text style={[styles.statCard2Lbl, { color: active ? s.color : C.muted }]}>{s.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* Bar chart — weekly */}
@@ -1658,8 +1666,10 @@ const styles = StyleSheet.create({
     flex: 1, minWidth: '45%', backgroundColor: C.card, borderRadius: 12,
     borderWidth: 1, borderColor: C.border, padding: 14,
   },
-  statCard2Val: { color: C.txt, fontSize: 22, fontWeight: '800', marginBottom: 4 },
-  statCard2Lbl: { color: C.muted, fontSize: 8.5, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statCard2IconRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  statCard2Dot: { width: 6, height: 6, borderRadius: 3 },
+  statCard2Val: { color: C.txt, fontSize: 20, fontWeight: '800', marginBottom: 3 },
+  statCard2Lbl: { color: C.muted, fontSize: 10, letterSpacing: 0.3 },
 
   // HistoriaView
   wCard: {
@@ -1702,13 +1712,16 @@ const styles = StyleSheet.create({
   detailBackText: { color: RED, fontSize: 13, fontWeight: '700' },
   detailDate: { color: C.txt, fontSize: 18, fontWeight: '800', marginBottom: 12 },
   detailStats: {
-    flexDirection: 'row', backgroundColor: C.card,
-    borderWidth: 1, borderColor: C.border, borderRadius: 14, marginBottom: 14,
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14,
   },
-  detailStatItem:   { flex: 1, alignItems: 'center', paddingVertical: 12 },
-  detailStatBorder: { borderRightWidth: 1, borderRightColor: C.border },
-  detailStatVal:    { color: C.txt, fontSize: 14, fontWeight: '800', marginBottom: 2 },
-  detailStatLbl:    { color: C.muted, fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 },
+  detailStatItem: {
+    flex: 1, minWidth: '45%',
+    backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+    borderRadius: 12, padding: 12,
+  },
+  detailStatIconRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 4 },
+  detailStatVal:    { fontSize: 17, fontWeight: '800' },
+  detailStatLbl:    { color: C.muted, fontSize: 10, letterSpacing: 0.3 },
   detailCard: {
     backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
     borderRadius: 12, padding: 12, marginBottom: 8,
@@ -1830,11 +1843,6 @@ const styles = StyleSheet.create({
   pickerMonthCellActive:  { backgroundColor: RED, borderColor: RED },
   pickerMonthText:        { color: C.sub, fontSize: 12, fontWeight: '700' },
   pickerMonthTextActive:  { color: '#fff' },
-  statCard2Active: { borderColor: `${RED}55`, backgroundColor: `${RED}0a` },
-  statCard2Dot: {
-    position: 'absolute', bottom: 8, right: 8,
-    width: 5, height: 5, borderRadius: 2.5, backgroundColor: RED,
-  },
   muscleCard: {
     backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border,
     padding: 14, marginTop: 12,
@@ -1895,8 +1903,8 @@ const styles = StyleSheet.create({
   },
   calCellWorkout: { backgroundColor: `${RED}1a`, borderColor: `${RED}33` },
   calCellToday:   { borderColor: 'rgba(255,255,255,0.4)' },
-  calCellText:        { color: '#2a3040', fontSize: 10, fontWeight: '500' },
-  calCellGhost:       { opacity: 0.3 },
+  calCellText:        { color: C.muted, fontSize: 10, fontWeight: '600' },
+  calCellGhost:       { opacity: 0.25 },
   calCellWorkoutText: { color: RED, fontWeight: '700' },
   calCellTodayText:   { color: C.txt, fontWeight: '900' },
   calSummary:  { flexDirection: 'row', justifyContent: 'space-around', marginTop: 20 },
