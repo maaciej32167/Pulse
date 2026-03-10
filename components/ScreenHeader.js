@@ -21,7 +21,7 @@ export default function ScreenHeader({ navigation, icon, label, color }) {
   return (
     <View style={styles.wrap}>
       {/* Przycisk powrotu */}
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back} hitSlop={12}>
+      <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.back} hitSlop={12}>
         <Feather name="chevron-left" size={26} color="rgba(255,255,255,0.5)" />
       </TouchableOpacity>
 
