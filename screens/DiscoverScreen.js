@@ -106,9 +106,6 @@ function UserCard({ user }) {
       <View style={styles.userInfo}>
         <Text style={styles.userName}>{user.name}</Text>
         <View style={styles.userMeta}>
-          <View style={[styles.klassBadge, { borderColor: user.color + '55' }]}>
-            <Text style={[styles.klassText, { color: user.color }]}>{user.klass}</Text>
-          </View>
           <Text style={styles.userLevel}>LVL {user.level}</Text>
         </View>
         <Text style={styles.userVolume}>{user.volume}</Text>
@@ -152,7 +149,7 @@ export default function DiscoverScreen({ navigation }) {
 
   const filterUsers = (list) => !q
     ? list
-    : list.filter(u => u.name.toLowerCase().includes(q) || u.klass.toLowerCase().includes(q));
+    : list.filter(u => u.name.toLowerCase().includes(q));
 
   const sameGym  = filterUsers(USERS_SAME_GYM);
   const similar  = filterUsers(USERS_SIMILAR);

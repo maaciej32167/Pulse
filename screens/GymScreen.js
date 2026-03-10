@@ -183,12 +183,7 @@ function CheckInCard({ person }) {
       </View>
       <View style={styles.checkInInfo}>
         <Text style={styles.personName}>{person.name}</Text>
-        <View style={styles.klassBadgeRow}>
-          <View style={[styles.klassBadge, { borderColor: person.color + '55' }]}>
-            <Text style={[styles.klassText, { color: person.color }]}>{person.klass}</Text>
-          </View>
-          <Text style={styles.doingText}>{person.doing}</Text>
-        </View>
+        <Text style={styles.doingText}>{person.doing}</Text>
       </View>
       <View style={styles.sinceWrap}>
         <LiveDot />
@@ -222,12 +217,7 @@ function RegularCard({ person, rank, sortKey }) {
       </View>
       <View style={styles.regularInfo}>
         <Text style={styles.personName}>{person.name}</Text>
-        <View style={styles.klassBadgeRow}>
-          <View style={[styles.klassBadge, { borderColor: person.color + '55' }]}>
-            <Text style={[styles.klassText, { color: person.color }]}>{person.klass}</Text>
-          </View>
-          <Text style={styles.personLevel}>LVL {person.level}</Text>
-        </View>
+        <Text style={styles.personLevel}>LVL {person.level}</Text>
       </View>
       <View style={styles.regularStats}>
         <Text style={styles.regularTrainings}>{metricVal}</Text>

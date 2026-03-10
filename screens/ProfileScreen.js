@@ -86,18 +86,6 @@ function fmtDurationShort(ms) {
 
 // ── RPG helpers ───────────────────────────────────────────────────────────────
 
-const RPG_CLASSES = [
-  { maxAvgReps: 5,   name: 'IRONBORN', icon: '⚒',  color: RED },
-  { maxAvgReps: 9,   name: 'WARRIOR',  icon: '⚔️',  color: '#f87171' },
-  { maxAvgReps: 15,  name: 'COLOSSUS', icon: '💪',  color: '#a78bfa' },
-  { maxAvgReps: 999, name: 'ATHLETE',  icon: '⚡', color: '#00F5FF' },
-];
-
-function getRPGClass(records) {
-  if (!records.length) return { name: 'ROOKIE', icon: '🌱', color: C.muted };
-  const avg = records.reduce((s, r) => s + Number(r.reps || 0), 0) / records.length;
-  return RPG_CLASSES.find(c => avg < c.maxAvgReps) || RPG_CLASSES[RPG_CLASSES.length - 1];
-}
 
 function calcXPLevel(records) {
   const xp = records.length * 10;
@@ -296,6 +284,28 @@ function EditProfileModal({ visible, profile, onSave, onClose }) {
             </View>
           ))}
 
+          <Text style={styles.modalLabel}>Bio</Text>
+          <TextInput
+            style={[styles.modalInput, { height: 72, textAlignVertical: 'top' }]}
+            value={draft.bio || ''}
+            onChangeText={v => set('bio', v)}
+            placeholder="Opisz siebie…"
+            placeholderTextColor={C.muted}
+            multiline
+            maxLength={160}
+          />
+
+          <Text style={styles.modalLabel}>Link</Text>
+          <TextInput
+            style={styles.modalInput}
+            value={draft.link || ''}
+            onChangeText={v => set('link', v)}
+            placeholder="https://example.com"
+            placeholderTextColor={C.muted}
+            autoCapitalize="none"
+            keyboardType="url"
+          />
+
           <View style={styles.modalRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.modalLabel}>Waga (kg)</Text>
@@ -335,7 +345,6 @@ function ProfileHero({ profile, records, onEditPress }) {
   const dayMap = useMemo(() => groupByDay(records), [records]);
   const { level } = calcXPLevel(records);
   const streak    = calcDayStreak(dayMap);
-  const cls       = getRPGClass(records);
   const streakLbl = streak === 1 ? 'dzień' : 'dni';
 
   return (
@@ -356,7 +365,6 @@ function ProfileHero({ profile, records, onEditPress }) {
       {/* Right: info */}
       <View style={styles.heroInfo}>
         <Text style={styles.heroName} numberOfLines={1}>{profile.name || 'Twój Profil'}</Text>
-        <Text style={[styles.heroClass, { color: cls.color }]}>{cls.icon} {cls.name}</Text>
         {!!profile.gym && (
           <Text style={styles.heroGym} numberOfLines={1}>{profile.gym}</Text>
         )}

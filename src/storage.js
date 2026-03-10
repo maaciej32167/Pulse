@@ -233,6 +233,8 @@ export async function loadProfile() {
     photo:    null,
     weight:   null,   // kg
     age:      null,
+    bio:      '',
+    link:     '',
   };
 }
 
