@@ -395,7 +395,7 @@ function getPRExercises(dayRecords, allRecords, dayStart) {
     const prev = allRecords.filter(p =>
       p.exercise === r.exercise && startOfDay(p.timestamp || 0) < dayStart
     );
-    if (prev.length === 0) continue;
+    if (prev.length === 0) { prs.add(r.exercise); continue; }
     const bestPrev = Math.max(...prev.map(p => estimate1RM(Number(p.weight), Number(p.reps))));
     const bestCur = Math.max(...dayRecords
       .filter(d => d.exercise === r.exercise)

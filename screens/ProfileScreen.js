@@ -472,16 +472,14 @@ function StatsView({ records, ironPath }) {
         </Text>
         <View style={styles.chartBarsRow}>
           {chartData.map((d, i) => {
-            const v   = d[metric];
-            const h   = Math.max(maxVal > 0 ? Math.round((v / maxVal) * BAR_H) : 0, v > 0 ? 2 : 0);
-            const isM = v === Math.max(...chartData.map(x => x[metric])) && v > 0;
+            const v = d[metric];
+            const h = v > 0 ? Math.max(Math.round((v / maxVal) * BAR_H), 3) : 2;
             return (
               <View key={i} style={styles.chartBarCol}>
-                {isM && <Text style={[styles.chartTopLabel, { color: RED }]}>{fmtBarVal(d)}</Text>}
+                <Text style={styles.chartBarTopLabel}>{v > 0 ? fmtBarVal(d) : ''}</Text>
                 <View style={[styles.chartBar, {
-                  height: Math.max(h, 2),
-                  backgroundColor: isM ? RED : v === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.12)',
-                  ...(isM && { shadowColor: RED, shadowOpacity: 0.5, shadowRadius: 6 }),
+                  height: h,
+                  backgroundColor: v > 0 ? RED : 'rgba(255,255,255,0.04)',
                 }]} />
                 <Text style={styles.chartBarLabel}>{d.label}</Text>
               </View>
@@ -520,8 +518,8 @@ function getPRExercises(dayRecs, allRecords, dayStart) {
   for (const r of dayRecs) {
     if (seen.has(r.exercise)) continue;
     seen.add(r.exercise);
-    const prev = allRecords.filter(p => p.exercise === r.exercise && startOfDay(p.timestamp || 0) < dayStart);
-    if (!prev.length) continue;
+    const prev = allRecords.filter(p => p.exercise === r.exercise && startOfDay(resolveTs(p)) < dayStart);
+    if (!prev.length) { prs.add(r.exercise); continue; }
     const bestPrev = Math.max(...prev.map(p => estimate1RM(Number(p.weight), Number(p.reps)) || 0));
     const bestCur  = Math.max(...dayRecs.filter(d => d.exercise === r.exercise).map(d => estimate1RM(Number(d.weight), Number(d.reps)) || 0));
     if (bestCur > bestPrev) prs.add(r.exercise);
@@ -596,7 +594,7 @@ function WorkoutCard({ day, dayRecs, allRecords, bodyWeight, bwExercises, onSele
             <View key={row.ex} style={[styles.exRow, i < exRows.length - 1 && styles.exRowBorder]}>
               <Text style={styles.exName} numberOfLines={1}>{row.ex}</Text>
               <Text style={styles.exSets}>{row.sets}</Text>
-              <Text style={[styles.exWeight, row.pr && { color: RED, fontWeight: '700' }]}>{row.volume}</Text>
+              <Text style={styles.exWeight}>{row.volume}</Text>
             </View>
           ))}
           <View style={styles.wCardActions}>
@@ -628,16 +626,19 @@ function HistoriaDetail({ day, dayRecs, allRecords, bodyWeight, bwExercises, dat
   const dayStart    = timestamps.length ? Math.min(...timestamps) : 0;
   const duration    = timestamps.length > 1 ? Math.max(...timestamps) - Math.min(...timestamps) : null;
 
-  const prMap = new Map(), prSet = new Set();
-  for (const { exercise, sets } of groups) {
-    const bestCur = Math.max(...sets.map(s => estimate1RM(Number(s.weight), Number(s.reps)) || 0));
-    if (bestCur > 0) prMap.set(exercise, round1(bestCur));
-    const prev = allRecords.filter(r => r.exercise === exercise && (r.timestamp || 0) < dayStart);
-    if (prev.length) {
-      const bestPrev = Math.max(...prev.map(r => estimate1RM(Number(r.weight), Number(r.reps)) || 0));
-      if (bestCur > bestPrev) prSet.add(exercise);
-    }
+  // PR — obliczane dynamicznie, spójne z getPRExercises
+  const prExercises = new Set(getPRExercises(dayRecs, allRecords, dayStart));
+  const prSetIds    = new Set();
+  for (const exercise of prExercises) {
+    const exSets  = dayRecs.filter(r => r.exercise === exercise);
+    const bestSet = exSets.reduce((best, s) => {
+      const orm     = estimate1RM(Number(s.weight), Number(s.reps)) || 0;
+      const bestOrm = estimate1RM(Number(best.weight), Number(best.reps)) || 0;
+      return orm > bestOrm ? s : best;
+    });
+    if (bestSet?.id != null) prSetIds.add(String(bestSet.id));
   }
+
 
   return (
     <ScrollView contentContainerStyle={styles.listPad} showsVerticalScrollIndicator={false}>
@@ -668,37 +669,28 @@ function HistoriaDetail({ day, dayRecs, allRecords, bodyWeight, bwExercises, dat
 
       {/* Exercise cards */}
       {groups.map(({ exercise, sets }) => {
-        const pr1RM = prMap.get(exercise);
-        const isPR  = prSet.has(exercise);
-        const isBW  = bwExercises && bwExercises.has(exercise);
+        const isBW = bwExercises && bwExercises.has(exercise);
         return (
           <View key={exercise} style={styles.detailCard}>
             <View style={styles.detailCardHeader}>
               <Text style={styles.detailExName}>{exercise}</Text>
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                {isPR && (
-                  <View style={styles.detailPRBadge}>
-                    <Text style={styles.detailPRText}>★ PR</Text>
-                  </View>
-                )}
-                {pr1RM && <Text style={styles.detailOrm}>1RM ≈ {pr1RM} kg</Text>}
-              </View>
             </View>
             {sets.map((s, i) => {
               const weightStr = isBW
                 ? `${round1(s.bodyWeightKg || bodyWeight)} + ${round1(s.weight)} kg`
                 : `${round1(s.weight)} kg`;
+              const isSetPR = s.id != null && prSetIds.has(String(s.id));
               return (
-                <View key={s.id || i} style={[styles.detailSetRow, s.isPR && styles.detailSetRowPR]}>
+                <View key={s.id || i} style={[styles.detailSetRow, isSetPR && styles.detailSetRowPR]}>
                   <Text style={styles.detailSetNum}>{i + 1}</Text>
-                  <Text style={styles.detailSetWeight}>
+                  <Text style={[styles.detailSetWeight, isSetPR && { color: C.txt }]}>
                     {weightStr}<Text style={styles.detailSetX}> × </Text>
                     <Text style={styles.detailSetReps}>{s.reps} reps</Text>
                   </Text>
                   <Text style={styles.detailSetVol}>{Math.round((Number(s.weight) || 0) * (Number(s.reps) || 0))} kg</Text>
-                  {s.isPR && (
+                  {isSetPR && (
                     <View style={styles.detailPRMedal}>
-                      <Text style={styles.detailPRMedalText}>PR</Text>
+                      <Text style={styles.detailPRMedalText}>🏆</Text>
                     </View>
                   )}
                 </View>
@@ -1201,11 +1193,20 @@ function MonthlyReportView({ records }) {
   const periodEnd   = mode === 'year' ? yearEnd   : mEnd;
   const activeRecords = useMemo(() =>
     records.filter(r => {
-      const ts = r.timestamp || 0;
+      const ts = resolveTs(r);
       return ts >= periodStart && ts <= periodEnd;
     }),
     [records, periodStart, periodEnd]
   );
+
+  const periodPRCount = useMemo(() => {
+    const dayMap = groupByDay(activeRecords);
+    let total = 0;
+    for (const [day, dayRecs] of dayMap) {
+      total += getPRExercises(dayRecs, records, day).length;
+    }
+    return total;
+  }, [activeRecords, records]);
 
   // ── Stat card definitions
   const activeStats = mode === 'year' ? yearStats : stats;
@@ -1213,7 +1214,7 @@ function MonthlyReportView({ records }) {
     { id: 'workouts', label: 'Treningi', value: `${activeStats.workouts}`,                                          icon: 'activity',    color: RED         },
     { id: 'duration', label: 'Czas',     value: activeStats.duration > 0 ? fmtDuration(activeStats.duration) : '—', icon: 'clock',       color: '#00F5FF'   },
     { id: 'volume',   label: 'Wolumen',  value: `${Math.round(activeStats.volume).toLocaleString('pl-PL')} kg`,      icon: 'trending-up', color: C.gold      },
-    { id: 'sets',     label: 'Serie',    value: `${activeStats.sets}`,                                               icon: 'layers',      color: '#a78bfa'   },
+    { id: 'sets',     label: 'PR',       value: `${periodPRCount}`,                                                  icon: 'award',       color: '#a78bfa'   },
   ];
 
   return (
@@ -1328,15 +1329,14 @@ function MonthlyReportView({ records }) {
         </Text>
         <View style={styles.chartBarsRow}>
           {activeChartData.map((d, i) => {
-            const h   = Math.max(d.value > 0 ? Math.round((d.value / maxVal) * BAR_H) : 0, d.value > 0 ? 3 : 0);
-            const isM = d.value === Math.max(...chartData.map(x => x.value)) && d.value > 0;
+            const v = d.value;
+            const h = v > 0 ? Math.max(Math.round((v / maxVal) * BAR_H), 3) : 2;
             return (
               <View key={i} style={styles.chartBarCol}>
-                {isM && <Text style={[styles.chartTopLabel, { color: RED }]}>{fmtBarVal(d.value)}</Text>}
+                <Text style={styles.chartBarTopLabel}>{v > 0 ? fmtBarVal(v) : ''}</Text>
                 <View style={[styles.chartBar, {
-                  height: Math.max(h, 2),
-                  backgroundColor: isM ? RED : d.value === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.12)',
-                  ...(isM && { shadowColor: RED, shadowOpacity: 0.5, shadowRadius: 6 }),
+                  height: h,
+                  backgroundColor: v > 0 ? RED : 'rgba(255,255,255,0.04)',
                 }]} />
                 <Text style={styles.chartBarLabel}>{d.label}</Text>
               </View>
@@ -1657,8 +1657,9 @@ const styles = StyleSheet.create({
   chartCardTitle: { color: C.sub, fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
   chartBarsRow:   { flexDirection: 'row', alignItems: 'flex-end', height: 100, gap: 4 },
   chartBarCol:    { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
-  chartTopLabel:  { fontSize: 7, fontWeight: '700', textAlign: 'center' },
-  chartBar:       { width: '85%', borderRadius: 3 },
+  chartTopLabel:    { fontSize: 7, fontWeight: '700', textAlign: 'center' },
+  chartBarTopLabel: { fontSize: 7, fontWeight: '700', color: C.sub, textAlign: 'center' },
+  chartBar:         { width: '85%', borderRadius: 3 },
   chartBarLabel:  { color: C.muted, fontSize: 8, textAlign: 'center' },
 
   statGrid2: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -1743,13 +1744,10 @@ const styles = StyleSheet.create({
   detailSetRowPR:  { backgroundColor: 'rgba(255,215,0,0.06)' },
   detailPRMedal: {
     width: 26, height: 26, borderRadius: 13,
-    backgroundColor: '#FFD700', borderWidth: 2, borderColor: '#B8860B',
-    alignItems: 'center', justifyContent: 'center', marginLeft: 4,
+    backgroundColor: '#FFD700',
+    alignItems: 'center', justifyContent: 'center',
   },
-  detailPRMedalText: {
-    color: '#000', fontSize: 7, fontWeight: '900',
-    fontStyle: 'italic', letterSpacing: 0.8, fontFamily: 'Georgia',
-  },
+  detailPRMedalText: { fontSize: 13 },
 
   // RekordsView
   rekordyToolbar: {
