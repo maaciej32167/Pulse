@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, FlatList, Modal, TextInput, Alert,
+  View, Text, StyleSheet, TouchableOpacity, FlatList, Modal, TextInput, Alert, ScrollView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -386,6 +386,105 @@ function fmtDuration(ms) {
   return `${m} min`;
 }
 
+// ─── Achievements ────────────────────────────────────────────────────────────
+
+function calcBestStreak(dayMap) {
+  const days = Array.from(dayMap.keys()).sort((a, b) => a - b);
+  let best = 0, cur = 0, prev = null;
+  for (const d of days) {
+    cur = prev !== null && d - prev === 86400000 ? cur + 1 : 1;
+    best = Math.max(best, cur);
+    prev = d;
+  }
+  return best;
+}
+
+function calcAchievements(records, dayMap) {
+  const sorted = [...records].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+  const firstBlood = sorted.length === 0
+    ? { unlocked: false }
+    : { unlocked: true, date: sorted[0].isoDate };
+
+  const centuryClub = sorted.length < 100
+    ? { unlocked: false, progress: sorted.length, goal: 100 }
+    : { unlocked: true, date: sorted[99].isoDate };
+
+  const ironStreak = (() => {
+    const best = calcBestStreak(dayMap);
+    return best < 7 ? { unlocked: false, progress: best, goal: 7 } : { unlocked: true };
+  })();
+
+  const volumeMonster = (() => {
+    const byWorkout = new Map();
+    for (const r of sorted) {
+      const key = r.workoutId || r.isoDate || 'x';
+      if (!byWorkout.has(key)) byWorkout.set(key, { vol: 0, date: r.isoDate });
+      byWorkout.get(key).vol += (Number(r.weight) || 0) * (Number(r.reps) || 0);
+    }
+    const best = Array.from(byWorkout.values()).reduce((b, w) => w.vol > b.vol ? w : b, { vol: 0 });
+    return best.vol < 10000
+      ? { unlocked: false, progress: Math.round(best.vol), goal: 10000 }
+      : { unlocked: true, date: best.date };
+  })();
+
+  const prHunter = (() => {
+    const prs = sorted.filter(r => r.isPR);
+    return prs.length < 10
+      ? { unlocked: false, progress: prs.length, goal: 10 }
+      : { unlocked: true, date: prs[9].isoDate };
+  })();
+
+  return [
+    { key: 'firstBlood',    name: 'First Blood',    desc: '1. trening',          icon: 'zap',         color: '#f87171', ...firstBlood    },
+    { key: 'centuryClub',   name: 'Century Club',   desc: '100 serii',           icon: 'layers',      color: '#fbbf24', ...centuryClub   },
+    { key: 'ironStreak',    name: 'Iron Streak',    desc: '7 dni z rzędu',       icon: 'trending-up', color: '#818cf8', ...ironStreak    },
+    { key: 'volumeMonster', name: 'Vol. Monster',   desc: '10 000 kg / trening', icon: 'bar-chart-2', color: '#34d399', ...volumeMonster  },
+    { key: 'prHunter',      name: 'PR Hunter',      desc: '10 PR-ów',            icon: 'award',       color: '#00F5FF', ...prHunter      },
+  ];
+}
+
+function AchievementsRow({ records }) {
+  const dayMap = useMemo(() => {
+    const map = new Map();
+    for (const r of records) {
+      const d = startOfDay(r.timestamp || 0);
+      if (!d) continue;
+      if (!map.has(d)) map.set(d, []);
+      map.get(d).push(r);
+    }
+    return map;
+  }, [records]);
+
+  const achievements = useMemo(() => calcAchievements(records, dayMap), [records, dayMap]);
+
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <Text style={styles.achievSectionLabel}>OSIĄGNIĘCIA</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+        {achievements.map(a => (
+          <View key={a.key} style={[styles.achievChip, !a.unlocked && styles.achievChipLocked]}>
+            <View style={[styles.achievChipIcon, { backgroundColor: a.color + (a.unlocked ? '22' : '10'), borderColor: a.color + (a.unlocked ? '55' : '25') }]}>
+              <Feather name={a.icon} size={18} color={a.unlocked ? a.color : C.muted} />
+            </View>
+            <Text style={[styles.achievChipName, !a.unlocked && { color: C.muted }]}>{a.name}</Text>
+            <Text style={styles.achievChipDesc}>{a.desc}</Text>
+            {!a.unlocked && a.progress != null && (
+              <View style={{ marginTop: 4 }}>
+                <View style={styles.achievBar}>
+                  <View style={[styles.achievBarFill, { width: `${Math.min(100, Math.round(a.progress / a.goal * 100))}%`, backgroundColor: a.color }]} />
+                </View>
+                <Text style={styles.achievProgress}>{a.progress}/{a.goal}</Text>
+              </View>
+            )}
+            {a.unlocked && <Feather name="check-circle" size={12} color={a.color} style={{ marginTop: 4 }} />}
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
 function getPRExercises(dayRecords, allRecords, dayStart) {
   const prs = new Set();
   const seen = new Set();
@@ -417,7 +516,12 @@ function TreningiView({ records, bodyWeight, bwExercises, navigation }) {
   days.sort((a, b) => b - a);
 
   if (days.length === 0) {
-    return <View style={styles.empty}><Text style={styles.emptyText}>Brak treningów</Text></View>;
+    return (
+      <View style={{ flex: 1 }}>
+        <AchievementsRow records={records} />
+        <View style={styles.empty}><Text style={styles.emptyText}>Brak treningów</Text></View>
+      </View>
+    );
   }
 
   return (
@@ -425,6 +529,7 @@ function TreningiView({ records, bodyWeight, bwExercises, navigation }) {
       data={days}
       keyExtractor={day => String(day)}
       contentContainerStyle={styles.list}
+      ListHeaderComponent={<AchievementsRow records={records} />}
       renderItem={({ item: day }) => {
         const dayRecords = map.get(day);
         const exercises = [...new Set(dayRecords.map(r => r.exercise))];
@@ -721,4 +826,15 @@ const styles = StyleSheet.create({
   modalItemText: { color: C.txt, fontSize: 15 },
   modalItemTextActive: { color: C.accent, fontWeight: '700' },
   modalCheck: { color: C.accent, fontSize: 16, fontWeight: '700' },
+
+  // Achievements row
+  achievSectionLabel: { color: C.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, marginLeft: 16, marginBottom: 8 },
+  achievChip:         { width: 110, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', padding: 12, alignItems: 'center' },
+  achievChipLocked:   { opacity: 0.45 },
+  achievChipIcon:     { width: 40, height: 40, borderRadius: 12, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  achievChipName:     { color: C.txt, fontSize: 11, fontWeight: '800', textAlign: 'center' },
+  achievChipDesc:     { color: C.muted, fontSize: 10, textAlign: 'center', marginTop: 2 },
+  achievBar:          { height: 3, width: 70, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' },
+  achievBarFill:      { height: 3, borderRadius: 2 },
+  achievProgress:     { color: C.muted, fontSize: 9, textAlign: 'center', marginTop: 2 },
 });

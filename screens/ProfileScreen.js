@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList,
-  Modal, TextInput, LayoutAnimation, Platform, UIManager,
+  Modal, TextInput, LayoutAnimation, Platform, UIManager, Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -114,6 +114,57 @@ function calcBestStreak(dayMap) {
     prev = d;
   }
   return best;
+}
+
+function calcAchievements(records, dayMap) {
+  const sorted = [...records].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+  // First Blood — pierwszy trening
+  const firstBlood = (() => {
+    if (sorted.length === 0) return { unlocked: false };
+    return { unlocked: true, date: sorted[0].isoDate };
+  })();
+
+  // Century Club — 100 serii
+  const centuryClub = (() => {
+    if (sorted.length < 100) return { unlocked: false, progress: sorted.length, goal: 100 };
+    return { unlocked: true, date: sorted[99].isoDate };
+  })();
+
+  // Iron Streak — 7 dni z rzędu
+  const ironStreak = (() => {
+    const best = calcBestStreak(dayMap);
+    if (best < 7) return { unlocked: false, progress: best, goal: 7 };
+    return { unlocked: true };
+  })();
+
+  // Volume Monster — 10 000 kg w jednym treningu
+  const volumeMonster = (() => {
+    const byWorkout = new Map();
+    for (const r of sorted) {
+      const key = r.workoutId || r.isoDate || 'x';
+      if (!byWorkout.has(key)) byWorkout.set(key, { vol: 0, date: r.isoDate });
+      byWorkout.get(key).vol += (Number(r.weight) || 0) * (Number(r.reps) || 0);
+    }
+    const best = Array.from(byWorkout.values()).reduce((b, w) => w.vol > b.vol ? w : b, { vol: 0 });
+    if (best.vol < 10000) return { unlocked: false, progress: Math.round(best.vol), goal: 10000 };
+    return { unlocked: true, date: best.date };
+  })();
+
+  // PR Hunter — 10 PR-ów
+  const prHunter = (() => {
+    const prs = sorted.filter(r => r.isPR);
+    if (prs.length < 10) return { unlocked: false, progress: prs.length, goal: 10 };
+    return { unlocked: true, date: prs[9].isoDate };
+  })();
+
+  return [
+    { key: 'firstBlood',    name: 'First Blood',      desc: 'Pierwszy trening',                   icon: 'zap',        color: '#f87171', ...firstBlood   },
+    { key: 'centuryClub',   name: 'Century Club',     desc: '100 serii łącznie',                  icon: 'layers',     color: '#fbbf24', ...centuryClub  },
+    { key: 'ironStreak',    name: 'Iron Streak',      desc: '7 dni treningu z rzędu',             icon: 'trending-up',color: '#818cf8', ...ironStreak   },
+    { key: 'volumeMonster', name: 'Volume Monster',   desc: '10 000 kg w jednym treningu',        icon: 'bar-chart-2',color: '#34d399', ...volumeMonster},
+    { key: 'prHunter',      name: 'PR Hunter',        desc: '10 rekordów osobistych',             icon: 'award',      color: '#00F5FF', ...prHunter     },
+  ];
 }
 
 function calcIronPath(records, dayMap, bodyWeight) {
@@ -753,6 +804,59 @@ function HistoriaDetail({ day, dayRecs, allRecords, bodyWeight, bwExercises, dat
   );
 }
 
+function AchievementsRow({ records, dayMap }) {
+  const achievements = useMemo(() => calcAchievements(records, dayMap), [records, dayMap]);
+  const [selected, setSelected] = useState(null);
+
+  return (
+    <View style={{ marginBottom: 6 }}>
+      <Text style={styles.achievSectionLabel}>OSIĄGNIĘCIA</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+        {achievements.map(a => (
+          <TouchableOpacity key={a.key} style={[styles.achievChip, !a.unlocked && styles.achievChipLocked]} onPress={() => setSelected(a)} activeOpacity={0.75}>
+            <View style={[styles.achievChipIcon, { backgroundColor: a.color + (a.unlocked ? '22' : '10'), borderColor: a.color + (a.unlocked ? '55' : '25') }]}>
+              <Feather name={a.icon} size={18} color={a.unlocked ? a.color : C.muted} />
+            </View>
+            <Text style={[styles.achievChipName, !a.unlocked && { color: C.muted }]}>{a.name}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <Modal visible={!!selected} transparent animationType="fade" onRequestClose={() => setSelected(null)}>
+        <Pressable style={styles.achievModalOverlay} onPress={() => setSelected(null)}>
+          <Pressable style={styles.achievModalBox} onPress={() => {}}>
+            {selected && (
+              <>
+                <View style={[styles.achievModalIcon, { backgroundColor: selected.color + '22', borderColor: selected.color + '55' }]}>
+                  <Feather name={selected.icon} size={30} color={selected.unlocked ? selected.color : C.muted} />
+                </View>
+                <Text style={[styles.achievModalName, { color: selected.unlocked ? selected.color : C.muted }]}>{selected.name}</Text>
+                <Text style={styles.achievModalDesc}>{selected.desc}</Text>
+                {selected.unlocked
+                  ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 }}>
+                      <Feather name="check-circle" size={14} color={selected.color} />
+                      <Text style={{ color: selected.color, fontSize: 13, fontWeight: '700' }}>
+                        {selected.date ? `Odblokowano ${selected.date}` : 'Odblokowano'}
+                      </Text>
+                    </View>
+                  : selected.progress != null && (
+                      <View style={{ width: '100%', marginTop: 14 }}>
+                        <View style={[styles.achievBar, { width: '100%', height: 5 }]}>
+                          <View style={[styles.achievBarFill, { width: `${Math.min(100, Math.round(selected.progress / selected.goal * 100))}%`, backgroundColor: selected.color, height: 5 }]} />
+                        </View>
+                        <Text style={[styles.achievProgress, { marginTop: 6, fontSize: 12 }]}>{selected.progress} / {selected.goal}</Text>
+                      </View>
+                    )
+                }
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
+
 function HistoriaView({ records, bodyWeight, bwExercises }) {
   const dayMap    = useMemo(() => groupByDay(records), [records]);
   const days      = useMemo(() => Array.from(dayMap.keys()).sort((a, b) => b - a), [dayMap]);
@@ -768,7 +872,12 @@ function HistoriaView({ records, bodyWeight, bwExercises }) {
   }
 
   if (!days.length) {
-    return <View style={styles.empty}><Text style={styles.emptyText}>Brak treningów</Text></View>;
+    return (
+      <View style={{ flex: 1 }}>
+        <AchievementsRow records={records} dayMap={dayMap} />
+        <View style={styles.empty}><Text style={styles.emptyText}>Brak treningów</Text></View>
+      </View>
+    );
   }
 
   return (
@@ -776,7 +885,12 @@ function HistoriaView({ records, bodyWeight, bwExercises }) {
       data={days}
       keyExtractor={d => String(d)}
       contentContainerStyle={styles.listPad}
-      ListHeaderComponent={<Text style={styles.listSectionTitle}>Ostatnie treningi</Text>}
+      ListHeaderComponent={
+        <>
+          <AchievementsRow records={records} dayMap={dayMap} />
+          <Text style={styles.listSectionTitle}>Ostatnie treningi</Text>
+        </>
+      }
       renderItem={({ item: day }) => (
         <WorkoutCard
           day={day}
@@ -2331,4 +2445,19 @@ const styles = StyleSheet.create({
   cwiczDropItem:       { paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
   cwiczDropItemActive: { backgroundColor: RED + '12' },
   cwiczDropItemText:   { color: C.sub, fontSize: 13, fontWeight: '600' },
+
+  // Achievements row
+  achievSectionLabel:  { color: C.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, marginLeft: 16, marginBottom: 8, marginTop: 14 },
+  achievChip:          { width: 76, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', padding: 10, alignItems: 'center', gap: 6 },
+  achievChipLocked:    { opacity: 0.45 },
+  achievChipIcon:      { width: 40, height: 40, borderRadius: 12, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  achievChipName:      { color: C.txt, fontSize: 9, fontWeight: '800', textAlign: 'center' },
+  achievBar:           { height: 3, width: 70, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' },
+  achievBarFill:       { height: 3, borderRadius: 2 },
+  achievProgress:      { color: C.muted, fontSize: 9, textAlign: 'center', marginTop: 2 },
+  achievModalOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
+  achievModalBox:      { backgroundColor: '#111318', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', padding: 28, width: 260, alignItems: 'center' },
+  achievModalIcon:     { width: 64, height: 64, borderRadius: 18, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  achievModalName:     { fontSize: 18, fontWeight: '900', letterSpacing: 0.5, marginBottom: 6 },
+  achievModalDesc:     { color: C.muted, fontSize: 13, textAlign: 'center' },
 });
