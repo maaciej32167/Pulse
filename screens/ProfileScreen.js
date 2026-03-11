@@ -375,12 +375,16 @@ function ProfileHero({ profile, records, onEditPress }) {
         </Text>
       </View>
 
-      {/* Gear */}
-      <TouchableOpacity style={styles.heroGear} onPress={onEditPress} hitSlop={12}>
-        <View style={styles.heroGearBox}>
-          <Text style={styles.heroGearText}>⚙</Text>
-        </View>
-      </TouchableOpacity>
+      {/* Ikony — prawy górny róg (na końcu = na wierzchu) */}
+      <View style={styles.heroTopBtns}>
+        <TouchableOpacity onPress={onEditPress} hitSlop={12}>
+          <Feather name="edit-2" size={16} color={C.muted} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => {}} hitSlop={12}>
+          <Feather name="settings" size={16} color={C.muted} />
+        </TouchableOpacity>
+      </View>
+
     </View>
   );
 }
@@ -1898,7 +1902,11 @@ const styles = StyleSheet.create({
   // Hero
   hero: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: C.border,
+    borderBottomWidth: 1, borderBottomColor: C.border, position: 'relative',
+  },
+  heroTopBtns: {
+    position: 'absolute', top: 14, right: 18,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
   },
   avatarWrap: { position: 'relative', marginRight: 14 },
   avatarImg: {
@@ -1922,11 +1930,10 @@ const styles = StyleSheet.create({
   heroGym:   { color: C.muted, fontSize: 10, marginBottom: 2 },
   heroMeta:  { color: C.muted, fontSize: 10 },
   heroGear:     { paddingLeft: 10 },
-  heroGearBox: {
-    width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: C.border,
-    alignItems: 'center', justifyContent: 'center',
+  heroEditBtn: {
+    position: 'absolute', top: 0, right: 0,
+    padding: 8,
   },
-  heroGearText: { fontSize: 14, color: C.sub },
 
   // Iron Path
   ironCard: {
