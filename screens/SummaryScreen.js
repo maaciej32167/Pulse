@@ -1,7 +1,10 @@
+import { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { round1 } from '../src/utils';
+import { loadAchievements, saveAchievements, loadBodyWeight, loadProfile } from '../src/storage';
+import { computeAchievementsFromRecords } from '../src/achievements';
 
 // ─── design tokens ────────────────────────────────────────────────────────────
 
@@ -49,6 +52,30 @@ function StatBox({ icon, value, label, color }) {
 
 export default function SummaryScreen({ navigation, route }) {
   const { gym, startTime, endTime, sets, allRecords } = route.params;
+
+  useEffect(() => {
+    async function checkAndSaveAchievements() {
+      try {
+        const [stored, bodyWeight, profile] = await Promise.all([
+          loadAchievements(), loadBodyWeight(), loadProfile(),
+        ]);
+        const { newlyUnlocked, progress } = computeAchievementsFromRecords(
+          allRecords, profile, bodyWeight, stored.unlockedIds
+        );
+        if (newlyUnlocked.length > 0) {
+          const updatedIds = [...stored.unlockedIds, ...newlyUnlocked.map(a => a.id)];
+          const updatedDates = { ...stored.unlockedDates };
+          newlyUnlocked.forEach(a => { if (a.date) updatedDates[a.id] = a.date; });
+          await saveAchievements({ unlockedIds: updatedIds, unlockedDates: updatedDates, progress });
+        } else {
+          await saveAchievements({ ...stored, progress });
+        }
+      } catch (e) {
+        console.warn('[Achievements] check error:', e);
+      }
+    }
+    checkAndSaveAchievements();
+  }, []);
 
   const duration = endTime - startTime;
   const exercises = [...new Set(sets.map(s => s.exercise))];

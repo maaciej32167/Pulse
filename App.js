@@ -17,6 +17,7 @@ import LogScreen       from './screens/LogScreen';
 import WorkoutScreen   from './screens/WorkoutScreen';
 import SummaryScreen         from './screens/SummaryScreen';
 import WorkoutDetailScreen   from './screens/WorkoutDetailScreen';
+import AchievementsScreen    from './screens/AchievementsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -56,6 +57,7 @@ export default function App() {
           <Stack.Screen name="Workout"   component={WorkoutScreen}   />
           <Stack.Screen name="Summary"        component={SummaryScreen}       />
           <Stack.Screen name="WorkoutDetail"  component={WorkoutDetailScreen}  />
+          <Stack.Screen name="Achievements"   component={AchievementsScreen}   />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

@@ -325,9 +325,27 @@ const C = {
 ## Plan rozwoju — kolejność
 
 ### Etap 1 — dokończyć Fazę 1 (fundament)
-- [ ] **Achievementy** (pierwsze 5: First Blood, Century Club, Iron Streak, Volume Monster, PR Hunter)
+- [x] **Achievementy** — pełna baza (src/achievements.js), ekran (AchievementsScreen), silnik zliczający (computeAchievementsFromRecords), zapis po treningu (SummaryScreen)
 - [ ] **Wykres 1RM w czasie** dla wybranego ćwiczenia (w RekordsView)
 - [ ] **Usuwanie ćwiczenia** w ExercisesScreen
+
+#### Achievementy — co działa / co czeka na backend
+
+**Działa teraz (local):**
+- Sesje: 1, 10, 25, 50, 100, 250, 500, 1000 treningów
+- Wolumen: łączny (10k → Everest) + 10k w jednej sesji
+- Czas: łączny (10h → 1000h) + Snajper (<35min) + Maraton (>2.5h)
+- Regularność: streak 7/14/30/60/100/365 dni
+- Siła: talerki (1-4), ciężar własny, 2x bodyweight, Ghost Lift, Iron Trinity, Feniks
+- Ukryte: Bezsenność (23-5), Nowy Rok (1 stycznia), Piątek 13, 666 serii, Jutrznia (5-7 rano)
+
+**Czeka na backend / dane:**
+- SPOŁECZNOŚĆ (followers, znajomi, ranking) → wymaga backendu Faza 2
+- EKSPLORACJA (siłownie, miasta) → wymaga prawdziwego GPS check-in Faza 4
+- Urodziny (secret) → dodać pole `birthDate` do profilu użytkownika
+- Pełnia księżyca (secret) → zewnętrzne API lub algorytm lunar
+- Obserwator (secret, brak postów) → wymaga social feed Faza 2
+- Perfekcjonista (4 perfect weeks) → wymaga PlanScreen z planowaniem dni
 
 ### Etap 2 — Backend (Supabase)
 - [ ] Rejestracja i logowanie (email / Apple ID)

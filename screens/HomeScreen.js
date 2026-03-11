@@ -42,16 +42,16 @@ function toRad(deg) { return (deg * Math.PI) / 180; }
 const P = { IDLE: 0, OPEN: 1, HEARTBEAT: 2, EXPANDING: 3, CENTER: 4 };
 
 const MENU = [
-  { id: 'plan',     label: 'PLAN',     icon: 'calendar',    color: '#00F5FF', angle: -162, screen: 'Plan'      },
-  { id: 'workout',  label: 'TRENING',  icon: 'zap',         color: '#FF4757', angle:  -90, screen: 'Log'       },
-  { id: 'cwicz',    label: 'ĆWICZ.',   icon: 'bar-chart-2', color: '#00F5FF', angle:  -18, screen: 'Cwiczenia' },
-  { id: 'discover', label: 'DISCOVER', icon: 'compass',     color: '#818cf8', angle:   54, screen: 'Discover'  },
-  { id: 'profile',  label: 'PROFIL',   icon: 'user',        color: '#FF4757', angle:  126, screen: 'Profil'    },
+  { id: 'plan',     label: 'PLAN',     icon: 'calendar',    color: '#00F5FF', angle: -150, screen: 'Plan'         },
+  { id: 'workout',  label: 'TRENING',  icon: 'zap',         color: '#FF4757', angle:  -90, screen: 'Log'          },
+  { id: 'cwicz',    label: 'ĆWICZ.',   icon: 'bar-chart-2', color: '#00F5FF', angle:  -30, screen: 'Cwiczenia'    },
+  { id: 'discover', label: 'DISCOVER', icon: 'compass',     color: '#818cf8', angle:   30, screen: 'Discover'     },
+  { id: 'profile',  label: 'PROFIL',   icon: 'user',        color: '#FF4757', angle:   90, screen: 'Profil'       },
+  { id: 'achiev',   label: 'ACHIEV.',  icon: 'award',       color: '#fbbf24', angle:  150, screen: 'Achievements' },
 ];
 
 // Kolejność zgodna z ruchem wskazówek zegara (od 12):
-// workout(1,-90°) → cwicz(2,-18°) → discover(3,54°) → profile(4,126°) → plan(0,-162°)
-const CW_ORDER  = [1, 2, 3, 4, 0];
+const CW_ORDER  = [1, 2, 3, 4, 5, 0];
 const CCW_ORDER = [0, 4, 3, 2, 1];
 
 const C = {

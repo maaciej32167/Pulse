@@ -18,6 +18,7 @@ export const KEYS = {
   myGym:         'pulse_my_gym',
   profile:       'pulse_profile',
   plans:         'pulse_plans',
+  achievements:  'pulse_achievements',
 };
 
 // Legacy keys (sila app) — only used in migration
@@ -254,4 +255,13 @@ export async function savePlans(plans) {
 
 export async function saveProfile(profile) {
   await AsyncStorage.setItem(KEYS.profile, JSON.stringify(profile));
+}
+
+export async function loadAchievements() {
+  const stored = await AsyncStorage.getItem(KEYS.achievements);
+  return stored ? JSON.parse(stored) : { unlockedIds: [], unlockedDates: {}, progress: {} };
+}
+
+export async function saveAchievements(data) {
+  await AsyncStorage.setItem(KEYS.achievements, JSON.stringify(data));
 }

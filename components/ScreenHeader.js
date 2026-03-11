@@ -3,11 +3,12 @@ import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable } from 'reac
 import { Feather } from '@expo/vector-icons';
 
 const NAV_ITEMS = [
-  { label: 'TRENING',  icon: 'zap',         color: '#FF4757', screen: 'Log'       },
-  { label: 'PROFIL',   icon: 'user',         color: '#FF4757', screen: 'Profil'    },
-  { label: 'DISCOVER', icon: 'compass',      color: '#818cf8', screen: 'Discover'  },
-  { label: 'ĆWICZ.',   icon: 'bar-chart-2',  color: '#00F5FF', screen: 'Cwiczenia' },
-  { label: 'PLAN',     icon: 'calendar',     color: '#00F5FF', screen: 'Plan'      },
+  { label: 'TRENING',  icon: 'zap',         color: '#FF4757', screen: 'Log'          },
+  { label: 'PROFIL',   icon: 'user',         color: '#FF4757', screen: 'Profil'       },
+  { label: 'DISCOVER', icon: 'compass',      color: '#818cf8', screen: 'Discover'     },
+  { label: 'ĆWICZ.',   icon: 'bar-chart-2',  color: '#00F5FF', screen: 'Cwiczenia'    },
+  { label: 'PLAN',     icon: 'calendar',     color: '#00F5FF', screen: 'Plan'         },
+  { label: 'ACHIEV.',  icon: 'award',        color: '#fbbf24', screen: 'Achievements' },
 ];
 
 export default function ScreenHeader({ navigation, icon, label, color }) {
