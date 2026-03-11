@@ -8,7 +8,6 @@ import { View, ActivityIndicator } from 'react-native';
 
 import HomeScreen      from './screens/HomeScreen';
 import StartScreen     from './screens/StartScreen';
-import HistoryScreen   from './screens/HistoryScreen';
 import PlanScreen      from './screens/PlanScreen';
 import ExercisesScreen from './screens/ExercisesScreen';
 import ProfileScreen   from './screens/ProfileScreen';
@@ -48,7 +47,6 @@ export default function App() {
         >
           <Stack.Screen name="Home"      component={HomeScreen}      />
           <Stack.Screen name="Start"     component={StartScreen}     />
-          <Stack.Screen name="Historia"  component={HistoryScreen}   />
           <Stack.Screen name="Plan"      component={PlanScreen}      />
           <Stack.Screen name="Cwiczenia" component={ExercisesScreen} />
           <Stack.Screen name="Profil"    component={ProfileScreen}   />
