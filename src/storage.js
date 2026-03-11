@@ -17,6 +17,7 @@ export const KEYS = {
   bwEx:          'pulse_bw_exercises',
   myGym:         'pulse_my_gym',
   profile:       'pulse_profile',
+  plans:         'pulse_plans',
 };
 
 // Legacy keys (sila app) — only used in migration
@@ -183,6 +184,10 @@ export async function loadExercises() {
   return JSON.parse(stored);
 }
 
+export async function saveExercises(exercises) {
+  await AsyncStorage.setItem(KEYS.exercises, JSON.stringify(exercises));
+}
+
 export async function loadRecords() {
   await ensureMigrated();
   const stored = await AsyncStorage.getItem(KEYS.records);
@@ -236,6 +241,15 @@ export async function loadProfile() {
     bio:      '',
     link:     '',
   };
+}
+
+export async function loadPlans() {
+  const stored = await AsyncStorage.getItem(KEYS.plans);
+  return stored ? JSON.parse(stored) : [];
+}
+
+export async function savePlans(plans) {
+  await AsyncStorage.setItem(KEYS.plans, JSON.stringify(plans));
 }
 
 export async function saveProfile(profile) {

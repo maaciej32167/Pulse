@@ -550,6 +550,29 @@ function getPRExercises(dayRecs, allRecords, dayStart) {
   return [...prs];
 }
 
+// Liczy PR per seria — każda seria poprawiająca aktualny rekord (w tym wcześniejsze serie tego dnia)
+function countPRSets(dayRecs, allRecords, dayStart) {
+  const prevBest = {};
+  for (const r of allRecords) {
+    if (resolveTs(r) >= dayStart) continue;
+    const orm = estimate1RM(Number(r.weight), Number(r.reps)) || 0;
+    if (!prevBest[r.exercise] || orm > prevBest[r.exercise]) prevBest[r.exercise] = orm;
+  }
+  let count = 0;
+  const running = { ...prevBest };
+  const sorted = [...dayRecs].sort((a, b) => resolveTs(a) - resolveTs(b));
+  for (const r of sorted) {
+    const orm = estimate1RM(Number(r.weight), Number(r.reps)) || 0;
+    const best = running[r.exercise] || 0;
+    if (orm > best || !prevBest.hasOwnProperty(r.exercise)) {
+      count++;
+      running[r.exercise] = orm;
+      if (!prevBest.hasOwnProperty(r.exercise)) prevBest[r.exercise] = orm;
+    }
+  }
+  return count;
+}
+
 function groupExSets(dayRecs, prSet = new Set()) {
   const map = new Map();
   for (const r of dayRecs) {
@@ -1211,6 +1234,7 @@ function MonthlyReportView({ records }) {
         if      (metric === 'volume')   val += getDayVolume(recs);
         else if (metric === 'duration') val += getDayDurationMs(recs);
         else if (metric === 'workouts') val += recs.length > 0 ? 1 : 0;
+        else if (metric === 'sets')     val += recs.length > 0 ? countPRSets(recs, records, ts) : 0;
         else                            val += recs.length;
       }
       if (pn !== null) weeks.push({ label: `${pn}–${pt}`, value: val });
@@ -1245,6 +1269,7 @@ function MonthlyReportView({ records }) {
       if      (metric === 'volume')   value += getDayVolume(recs);
       else if (metric === 'duration') value += getDayDurationMs(recs);
       else if (metric === 'workouts') value += 1;
+      else if (metric === 'sets')     value += countPRSets(recs, records, day);
       else                            value += recs.length;
     }
     return { label: lbl.slice(0, 3).toUpperCase(), value };
@@ -1275,7 +1300,7 @@ function MonthlyReportView({ records }) {
     const dayMap = groupByDay(activeRecords);
     let total = 0;
     for (const [day, dayRecs] of dayMap) {
-      total += getPRExercises(dayRecs, records, day).length;
+      total += countPRSets(dayRecs, records, day);
     }
     return total;
   }, [activeRecords, records]);
@@ -1430,6 +1455,243 @@ function MonthlyReportView({ records }) {
   );
 }
 
+// ── CwiczeniaView ─────────────────────────────────────────────────────────────
+
+const PERIODS = [
+  { label: '7 dni',  days: 7  },
+  { label: '30 dni', days: 30 },
+  { label: '90 dni', days: 90 },
+  { label: 'Całość', days: null },
+];
+
+function CwiczeniaDetail({ exercise, records, bodyWeight, bwExercises, onBack }) {
+  const isBW = bwExercises.has(exercise);
+
+  const exRecs = useMemo(() =>
+    records.filter(r => r.exercise === exercise && r.timestamp > 0)
+           .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)),
+    [records, exercise]
+  );
+
+  const heaviest = useMemo(() => {
+    if (!exRecs.length) return null;
+    return exRecs.reduce((best, r) => {
+      const w = effectiveWeight(r, bwExercises, bodyWeight);
+      return w > (best ? effectiveWeight(best, bwExercises, bodyWeight) : -1) ? r : best;
+    }, null);
+  }, [exRecs, bwExercises, bodyWeight]);
+
+  const best1RM = useMemo(() => {
+    if (!exRecs.length) return null;
+    return exRecs.reduce((best, r) => {
+      const w = effectiveWeight(r, bwExercises, bodyWeight);
+      const orm = estimate1RM(w, Number(r.reps)) || 0;
+      return orm > (best?.orm || 0) ? { ...r, orm } : best;
+    }, null);
+  }, [exRecs, bwExercises, bodyWeight]);
+
+  const bestVolume = useMemo(() => {
+    if (!exRecs.length) return null;
+    return exRecs.reduce((best, r) => {
+      const w = effectiveWeight(r, bwExercises, bodyWeight);
+      const vol = w * (Number(r.reps) || 0);
+      return vol > (best?.vol || 0) ? { ...r, vol } : best;
+    }, null);
+  }, [exRecs, bwExercises, bodyWeight]);
+
+  function fmtWeight(r) {
+    if (!r) return '—';
+    if (isBW) return `${round1(r.bodyWeightKg || bodyWeight)} + ${round1(r.weight)} kg`;
+    return `${round1(r.weight)} kg`;
+  }
+
+  const prItems = [
+    { label: 'Największy ciężar', icon: 'trending-up', color: RED,
+      val: heaviest ? `${fmtWeight(heaviest)} × ${heaviest.reps}` : '—', sub: heaviest?.date },
+    { label: 'Najlepszy 1RM',     icon: 'award',       color: C.gold,
+      val: best1RM ? `${round1(best1RM.orm)} kg` : '—', sub: best1RM?.date },
+    { label: 'Wolumen w secie',   icon: 'layers',      color: '#a78bfa',
+      val: bestVolume ? `${Math.round(bestVolume.vol)} kg` : '—', sub: bestVolume?.date },
+  ];
+
+  return (
+    <ScrollView contentContainerStyle={styles.listPad} showsVerticalScrollIndicator={false}>
+      <TouchableOpacity style={styles.detailBack} onPress={onBack} activeOpacity={0.7}>
+        <Feather name="chevron-left" size={16} color={RED} />
+        <Text style={styles.detailBackText}>Ćwiczenia</Text>
+      </TouchableOpacity>
+
+      <Text style={[styles.detailDate, { marginBottom: 16 }]}>{exercise}</Text>
+
+      {/* PR kafelki */}
+      <View style={[styles.detailStats, { marginBottom: 20 }]}>
+        {prItems.map(({ label, icon, color, val, sub }) => (
+          <View key={label} style={styles.detailStatItem}>
+            <View style={styles.detailStatIconRow}>
+              <Feather name={icon} size={14} color={color} />
+              <Text style={[styles.detailStatVal, { color }]}>{val}</Text>
+            </View>
+            <Text style={styles.detailStatLbl}>{label}</Text>
+            {!!sub && <Text style={[styles.detailStatLbl, { marginTop: 2 }]}>{sub}</Text>}
+          </View>
+        ))}
+      </View>
+
+      {/* Ostatnie serie */}
+      <Text style={[styles.listSectionTitle, { marginBottom: 10 }]}>Historia serii</Text>
+      {exRecs.slice(0, 30).map((r, i) => (
+        <View key={r.id || i} style={[styles.detailSetRow, i > 0 && { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }]}>
+          <Text style={styles.detailSetNum}>{i + 1}</Text>
+          <Text style={styles.detailSetWeight}>
+            <Text style={{ color: RED }}>{fmtWeight(r)}</Text>
+            <Text style={styles.detailSetX}> × </Text>
+            <Text style={styles.detailSetReps}>{r.reps} reps</Text>
+          </Text>
+          <Text style={styles.detailSetVol}>{r.date || '—'}</Text>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+function CwiczeniaView({ records, bodyWeight, bwExercises }) {
+  const [period, setPeriod]       = useState(null);
+  const [selected, setSelected]   = useState(null);
+  const [query, setQuery]         = useState('');
+  const [sortDesc, setSortDesc]   = useState(true);
+  const [showPeriod, setShowPeriod] = useState(false);
+
+  const cutoff = useMemo(() => {
+    if (!period) return 0;
+    return Date.now() - period * 86400000;
+  }, [period]);
+
+  const filtered = useMemo(() =>
+    period ? records.filter(r => (r.timestamp || 0) >= cutoff) : records,
+    [records, cutoff, period]
+  );
+
+  // Częstotliwość: unikalne dni treningowe per ćwiczenie
+  const exerciseStats = useMemo(() => {
+    const map = new Map();
+    for (const r of filtered) {
+      if (!r.exercise) continue;
+      if (!map.has(r.exercise)) map.set(r.exercise, { days: new Set(), last: 0 });
+      const entry = map.get(r.exercise);
+      const day = startOfDay(r.timestamp || 0);
+      if (day) entry.days.add(day);
+      if ((r.timestamp || 0) > entry.last) entry.last = r.timestamp || 0;
+    }
+    return Array.from(map.entries())
+      .map(([ex, { days, last }]) => ({ ex, count: days.size, last }));
+  }, [filtered]);
+
+  const displayStats = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const base = q ? exerciseStats.filter(e => e.ex.toLowerCase().includes(q)) : exerciseStats;
+    return [...base].sort((a, b) => sortDesc
+      ? (b.count - a.count || b.last - a.last)
+      : (a.count - b.count || a.last - b.last));
+  }, [exerciseStats, query, sortDesc]);
+
+  if (selected) {
+    return (
+      <CwiczeniaDetail
+        exercise={selected}
+        records={records}
+        bodyWeight={bodyWeight}
+        bwExercises={bwExercises}
+        onBack={() => setSelected(null)}
+      />
+    );
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Toolbar: wyszukiwarka + okres + sortowanie */}
+      <View style={styles.cwiczToolRow}>
+        <View style={styles.cwiczSearchWrap}>
+          <Feather name="search" size={13} color={C.muted} />
+          <TextInput
+            style={styles.cwiczSearchInput}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Szukaj…"
+            placeholderTextColor={C.muted}
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {query.length > 0 && (
+            <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}>
+              <Feather name="x" size={13} color={C.muted} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View>
+          <TouchableOpacity style={styles.cwiczPeriodDropBtn} onPress={() => setShowPeriod(v => !v)}>
+            <Text style={styles.cwiczPeriodDropText}>
+              {PERIODS.find(p => p.days === period)?.label ?? 'Całość'}
+            </Text>
+            <Feather name={showPeriod ? 'chevron-up' : 'chevron-down'} size={12} color={C.muted} />
+          </TouchableOpacity>
+          {showPeriod && (
+            <View style={styles.cwiczDropMenu}>
+              {PERIODS.map(p => (
+                <TouchableOpacity
+                  key={p.label}
+                  style={[styles.cwiczDropItem, period === p.days && styles.cwiczDropItemActive]}
+                  onPress={() => { setPeriod(p.days); setShowPeriod(false); }}
+                >
+                  <Text style={[styles.cwiczDropItemText, period === p.days && { color: RED }]}>
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+
+        <TouchableOpacity style={styles.cwiczSortBtn} onPress={() => setSortDesc(d => !d)}>
+          <Feather name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color={RED} />
+        </TouchableOpacity>
+      </View>
+
+      {displayStats.length === 0 ? (
+        <View style={styles.empty}><Text style={styles.emptyText}>Brak danych</Text></View>
+      ) : (
+        <FlatList
+          data={displayStats}
+          keyExtractor={item => item.ex}
+          contentContainerStyle={styles.listPad}
+          renderItem={({ item, index }) => (
+            <TouchableOpacity
+              style={styles.cwiczRow}
+              onPress={() => setSelected(item.ex)}
+              activeOpacity={0.75}
+            >
+              <View style={styles.cwiczRank}>
+                <Text style={styles.cwiczRankText}>{index + 1}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cwiczName} numberOfLines={1}>{item.ex}</Text>
+                <Text style={styles.cwiczSub}>
+                  {item.count} {item.count === 1 ? 'dzień' : item.count < 5 ? 'dni' : 'dni'}
+                  {item.last ? ` · ostatnio ${new Date(item.last).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}` : ''}
+                </Text>
+              </View>
+              <View style={styles.cwiczFreqBadge}>
+                <Text style={styles.cwiczFreqNum}>{item.count}</Text>
+                <Feather name="chevron-right" size={14} color={C.muted} />
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+    </View>
+  );
+}
+
 // ── KalendarzView ─────────────────────────────────────────────────────────────
 
 function KalendarzView({ records, navigation, bodyWeight, bwExercises }) {
@@ -1551,7 +1813,7 @@ const TABS = [
   { key: 'historia', label: 'HISTORIA' },
   { key: 'rekordy',  label: 'REKORDY' },
   { key: 'dash',     label: 'RAPORT' },
-  { key: 'kalend',   label: 'KALENDARZ' },
+  { key: 'cwicz',    label: 'ĆWICZ.' },
 ];
 
 export default function ProfileScreen({ navigation }) {
@@ -1623,7 +1885,7 @@ export default function ProfileScreen({ navigation }) {
       {tab === 'historia' && <HistoriaView records={records} bodyWeight={bodyWeight} bwExercises={bwExercises} />}
       {tab === 'rekordy'  && <RekordsView  records={records} bodyWeight={bodyWeight} bwExercises={bwExercises} />}
       {tab === 'dash'     && <MonthlyReportView records={records} />}
-      {tab === 'kalend'   && <KalendarzView records={records} navigation={navigation} bodyWeight={bodyWeight} bwExercises={bwExercises} />}
+      {tab === 'cwicz'    && <CwiczeniaView records={records} bodyWeight={bodyWeight} bwExercises={bwExercises} />}
     </SafeAreaView>
   );
 }
@@ -2033,4 +2295,33 @@ const styles = StyleSheet.create({
     marginTop: 22, backgroundColor: RED, borderRadius: 12, padding: 14, alignItems: 'center',
   },
   modalSaveBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+
+  // CwiczeniaView
+  cwiczPeriodRow:       { flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingVertical: 10 },
+  cwiczPeriodBtn:       { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  cwiczPeriodBtnActive: { borderColor: RED, backgroundColor: RED + '18' },
+  cwiczPeriodText:      { color: C.muted, fontSize: 11, fontWeight: '700' },
+  cwiczPeriodTextActive:{ color: RED },
+  cwiczRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    padding: 12, marginBottom: 6,
+  },
+  cwiczRank:      { width: 28, height: 28, borderRadius: 14, backgroundColor: RED + '18', alignItems: 'center', justifyContent: 'center' },
+  cwiczRankText:  { color: RED, fontSize: 11, fontWeight: '800' },
+  cwiczName:      { color: C.txt, fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  cwiczSub:       { color: C.muted, fontSize: 11 },
+  cwiczFreqBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  cwiczFreqNum:   { color: RED, fontSize: 16, fontWeight: '800' },
+  cwiczToolRow:   { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8, alignItems: 'center' },
+  cwiczSearchWrap:{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: 10, paddingHorizontal: 10, height: 36 },
+  cwiczSearchInput:{ flex: 1, color: C.txt, fontSize: 13 },
+  cwiczSortBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: RED + '18', borderWidth: 1, borderColor: RED + '40', alignItems: 'center', justifyContent: 'center' },
+  cwiczPeriodDropBtn:  { flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, paddingHorizontal: 10, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  cwiczPeriodDropText: { color: C.txt, fontSize: 12, fontWeight: '700' },
+  cwiczDropMenu:       { position: 'absolute', top: 40, right: 0, backgroundColor: '#111318', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', zIndex: 100, minWidth: 90, overflow: 'hidden' },
+  cwiczDropItem:       { paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
+  cwiczDropItemActive: { backgroundColor: RED + '12' },
+  cwiczDropItemText:   { color: C.sub, fontSize: 13, fontWeight: '600' },
 });
