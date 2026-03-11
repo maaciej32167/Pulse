@@ -52,7 +52,7 @@ const MENU = [
 
 // Kolejność zgodna z ruchem wskazówek zegara (od 12):
 const CW_ORDER  = [1, 2, 3, 4, 5, 0];
-const CCW_ORDER = [0, 4, 3, 2, 1];
+const CCW_ORDER = [0, 5, 4, 3, 2, 1];
 
 const C = {
   bg: '#0A0A0C', txt: '#fff', muted: 'rgba(255,255,255,0.35)',
