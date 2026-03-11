@@ -322,41 +322,39 @@ const C = {
 
 ---
 
-## TODO — najbliższe kroki (Faza 1)
+## Plan rozwoju — kolejność
 
-### Profil użytkownika
-- [x] Waga ciała — edytowalny input w EditProfileModal (pole `weight`)
-- [x] Statystyki: treningi, wolumen, streak, śr. czas — zakładka STATS w ProfileScreen
-- [x] Zakładka REKORDY (RekordsView) — tabela serii z filtrem per ćwiczenie, sortowanie wg ciężaru/powt./1RM/daty
-- [x] Zakładka STATS — wykres słupkowy tydzień/6 mies. z metrykami CZAS/TRENINGI/WOLUMEN
-- [x] Poziom RPG i klasa postaci — calcXPLevel(), getRPGClass(), badge poziomu na avatarze
-- [x] Iron Path radar chart — 5 osi: SIŁA / WOLUMEN / REGULARNOŚĆ / RÓŻNORODNOŚĆ / PROGRES
+### Etap 1 — dokończyć Fazę 1 (fundament)
+- [ ] **Achievementy** (pierwsze 5: First Blood, Century Club, Iron Streak, Volume Monster, PR Hunter)
+- [ ] **Wykres 1RM w czasie** dla wybranego ćwiczenia (w RekordsView)
+- [ ] **Usuwanie ćwiczenia** w ExercisesScreen
 
-### System RPG (podstawy)
-- [x] Obliczanie XP za trening (calcXPLevel — 10 XP/seria, sqrt level)
-- [x] Pasek XP i poziom na profilu (badge na avatarze)
-- [ ] Achievementy (pierwsze 5) — nie zaimplementowane
+### Etap 2 — Backend (Supabase)
+- [ ] Rejestracja i logowanie (email / Apple ID)
+- [ ] Sync rekordów i profilu do bazy danych
+- [ ] Offline-first: AsyncStorage → upload po treningu
 
-### Historia
-- [x] HistoryScreen: zakładki Treningi / Serie / Top — pełna funkcjonalność z edycją i usuwaniem
-- [x] WorkoutDetailScreen — szczegóły treningu per seria
-- [ ] Wykres 1RM w czasie dla wybranego ćwiczenia — brak
+### Etap 3 — Social (Faza 2)
+- [ ] Feed znajomych (treningi, PR-y)
+- [ ] Dodawanie znajomych / wyszukiwanie użytkowników
+- [ ] Publiczny profil użytkownika
 
-### Ćwiczenia (ExercisesScreen)
-- [ ] Lista alfabetyczna z wyszukiwarką — placeholder "Wkrótce"
-- [ ] Dodawanie / usuwanie ćwiczenia
-- [ ] Oznaczanie jako BW (masa ciała)
+### Etap 4 — Rywalizacja (Faza 3)
+- [ ] Rankingi: wolumen / streak / siła — znajomi / siłownia / global
+- [ ] Rywal algorytmiczny (1v1, ~10–15% silniejszy)
+- [ ] Wyzwania sezonowe w siłowni
 
-### Plan (PlanScreen)
-- [ ] Cały ekran — placeholder "Wkrótce"
+### Etap 5 — B2B / App Store
+- [ ] Profil siłowni (claim przez właściciela)
+- [ ] Dashboard właściciela (retencja, ogłoszenia push)
+- [ ] EAS Build + TestFlight + App Store
 
-### App-wide
-- [ ] Ekran ładowania / splash screen — brak dedykowanego SplashScreen (jest ActivityIndicator w App.js)
-- [ ] Check-in: siłownie są mockiem (hardcoded GYMS w LogScreen), brak prawdziwej mapy/GPS
+---
 
-### Check-in / Check-out
-- [ ] Prawdziwa lista siłowni (GPS / wyszukiwarka API) — teraz mockowane
-- [ ] Automatyczny check-out po zakończeniu treningu
+### Odłożone na później
+- Splash screen / onboarding
+- Check-in GPS (prawdziwa mapa) — teraz mockowane
+- Automatyczny check-out po treningu
 
 ---
 
