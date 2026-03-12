@@ -62,6 +62,16 @@ function groupByDay(records) {
   return map;
 }
 
+function groupByWorkout(records) {
+  const map = new Map();
+  for (const r of records) {
+    const key = r.workoutId || `day_${startOfDay(r.timestamp || 0)}`;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(r);
+  }
+  return map;
+}
+
 function getDayVolume(recs) {
   return recs.reduce((s, r) => s + (Number(r.weight) || 0) * (Number(r.reps) || 0), 0);
 }
@@ -414,7 +424,9 @@ function StatsView({ records }) {
         d.setDate(monday.getDate() + i);
         const ts = startOfDay(d.getTime());
         const recs = dayMap.get(ts) || [];
-        return { label, volume: getDayVolume(recs), trainings: recs.length > 0 ? 1 : 0, duration: getDayDurationMs(recs) };
+        const uniqueWids = new Set(recs.map(r => r.workoutId).filter(Boolean));
+        const trainings = uniqueWids.size || (recs.length > 0 ? 1 : 0);
+        return { label, volume: getDayVolume(recs), trainings, duration: getDayDurationMs(recs) };
       });
     }
     return Array.from({ length: 6 }, (_, i) => {
@@ -423,7 +435,12 @@ function StatsView({ records }) {
       const mE = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59).getTime();
       let vol = 0, tr = 0, dur = 0;
       for (const [day, recs] of dayMap) {
-        if (day >= mS && day <= mE) { vol += getDayVolume(recs); tr++; dur += getDayDurationMs(recs); }
+        if (day >= mS && day <= mE) {
+          vol += getDayVolume(recs);
+          const wids = new Set(recs.map(r => r.workoutId).filter(Boolean));
+          tr += wids.size || (recs.length > 0 ? 1 : 0);
+          dur += getDayDurationMs(recs);
+        }
       }
       return { label: MONTHS_PL[d.getMonth()].slice(0, 3), volume: vol, trainings: tr, duration: dur };
     });
@@ -758,20 +775,37 @@ function HistoriaDetail({ day, dayRecs, allRecords, bodyWeight, bwExercises, dat
 
 
 function HistoriaView({ records, bodyWeight, bwExercises }) {
-  const dayMap    = useMemo(() => groupByDay(records), [records]);
-  const days      = useMemo(() => Array.from(dayMap.keys()).sort((a, b) => b - a), [dayMap]);
+  const workoutMap = useMemo(() => groupByWorkout(records), [records]);
   const [selected, setSelected] = useState(null);
 
+  const workouts = useMemo(() => {
+    return Array.from(workoutMap.entries())
+      .map(([wid, recs]) => {
+        const tss = recs.map(r => resolveTs(r)).filter(Boolean);
+        const startTime = tss.length ? Math.min(...tss) : 0;
+        return { wid, recs, startTime, day: startOfDay(startTime) };
+      })
+      .sort((a, b) => b.startTime - a.startTime);
+  }, [workoutMap]);
+
+  const listData = useMemo(() => {
+    const items = [];
+    let lastDay = null;
+    for (const w of workouts) {
+      if (w.day !== lastDay) {
+        items.push({ type: 'header', day: w.day });
+        lastDay = w.day;
+      }
+      items.push({ type: 'workout', ...w });
+    }
+    return items;
+  }, [workouts]);
+
   if (selected) {
-    return (
-      <HistoriaDetail
-        {...selected}
-        onBack={() => setSelected(null)}
-      />
-    );
+    return <HistoriaDetail {...selected} onBack={() => setSelected(null)} />;
   }
 
-  if (!days.length) {
+  if (!workouts.length) {
     return (
       <View style={{ flex: 1 }}>
         <View style={styles.empty}><Text style={styles.emptyText}>Brak treningów</Text></View>
@@ -781,22 +815,27 @@ function HistoriaView({ records, bodyWeight, bwExercises }) {
 
   return (
     <FlatList
-      data={days}
-      keyExtractor={d => String(d)}
+      data={listData}
+      keyExtractor={(item) => item.type === 'header' ? `h_${item.day}` : item.wid}
       contentContainerStyle={styles.listPad}
-      ListHeaderComponent={
-        <Text style={styles.listSectionTitle}>Ostatnie treningi</Text>
-      }
-      renderItem={({ item: day }) => (
-        <WorkoutCard
-          day={day}
-          dayRecs={dayMap.get(day)}
-          allRecords={records}
-          bodyWeight={bodyWeight}
-          bwExercises={bwExercises}
-          onSelect={setSelected}
-        />
-      )}
+      ListHeaderComponent={<Text style={styles.listSectionTitle}>Ostatnie treningi</Text>}
+      renderItem={({ item }) => {
+        if (item.type === 'header') {
+          const d = new Date(item.day);
+          const dayStr = d.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
+          return <Text style={styles.historyDateHeader}>{dayStr}</Text>;
+        }
+        return (
+          <WorkoutCard
+            day={item.startTime}
+            dayRecs={item.recs}
+            allRecords={records}
+            bodyWeight={bodyWeight}
+            bwExercises={bwExercises}
+            onSelect={setSelected}
+          />
+        );
+      }}
     />
   );
 }
@@ -1217,7 +1256,8 @@ function MonthlyReportView({ records }) {
     let workouts = 0, duration = 0, volume = 0, sets = 0;
     for (const [day, recs] of dayMap) {
       if (day < mStart || day > mEnd) continue;
-      workouts++;
+      const wids = new Set(recs.map(r => r.workoutId).filter(Boolean));
+      workouts += wids.size || 1;
       duration += getDayDurationMs(recs);
       volume   += getDayVolume(recs);
       sets     += recs.length;
@@ -1269,7 +1309,9 @@ function MonthlyReportView({ records }) {
     let workouts = 0, duration = 0, volume = 0, sets = 0;
     for (const [day, recs] of dayMap) {
       if (day < yearStart || day > yearEnd) continue;
-      workouts++; duration += getDayDurationMs(recs); volume += getDayVolume(recs); sets += recs.length;
+      const wids = new Set(recs.map(r => r.workoutId).filter(Boolean));
+      workouts += wids.size || 1;
+      duration += getDayDurationMs(recs); volume += getDayVolume(recs); sets += recs.length;
     }
     return { workouts, duration, volume, sets };
   }, [dayMap, year]);
@@ -1967,6 +2009,10 @@ const styles = StyleSheet.create({
   listSectionTitle: {
     color: C.muted, fontSize: 8.5, fontWeight: '700',
     letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 12,
+  },
+  historyDateHeader: {
+    color: C.sub, fontSize: 11, fontWeight: '700',
+    marginTop: 16, marginBottom: 8, textTransform: 'capitalize',
   },
 
   // StatsView
