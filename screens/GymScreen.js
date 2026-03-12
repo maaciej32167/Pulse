@@ -28,9 +28,9 @@ const C = {
 const GYM_DATA = {
   '1': {
     checkedIn: [
-      { id: 'c1', initials: 'MK', name: 'Marek Kowalski',   klass: 'Powerlifter', color: '#FF4757', since: '14:30', doing: 'Martwy ciąg' },
-      { id: 'c2', initials: 'AW', name: 'Anna Wiśniewska',  klass: 'Athlete',     color: '#00F5FF', since: '15:00', doing: 'Pull-upy' },
-      { id: 'c3', initials: 'RS', name: 'Robert Szymański', klass: 'Bodybuilder', color: '#818cf8', since: '15:20', doing: 'Klatka / ramiona' },
+      { id: 'c1', initials: 'MK', name: 'Marek Kowalski',   level: 24, klass: 'Powerlifter', color: '#FF4757', since: '14:30', doing: 'Martwy ciąg' },
+      { id: 'c2', initials: 'AW', name: 'Anna Wiśniewska',  level: 18, klass: 'Athlete',     color: '#00F5FF', since: '15:00', doing: 'Pull-upy' },
+      { id: 'c3', initials: 'RS', name: 'Robert Szymański', level: 31, klass: 'Bodybuilder', color: '#818cf8', since: '15:20', doing: 'Klatka / ramiona' },
     ],
     regulars: [
       { id: 'r1', initials: 'MK', name: 'Marek Kowalski',   level: 24, klass: 'Powerlifter', color: '#FF4757', trainings: 148, streak: 12, volume: 42000, duration: 168 },
@@ -51,7 +51,7 @@ const GYM_DATA = {
   },
   '2': {
     checkedIn: [
-      { id: 'c1', initials: 'DW', name: 'Damian Wróbel', klass: 'Bodybuilder', color: '#818cf8', since: '15:10', doing: 'Plecy / biceps' },
+      { id: 'c1', initials: 'DW', name: 'Damian Wróbel', level: 28, klass: 'Bodybuilder', color: '#818cf8', since: '15:10', doing: 'Plecy / biceps' },
     ],
     regulars: [
       { id: 'r1', initials: 'DW', name: 'Damian Wróbel', level: 28, klass: 'Bodybuilder', color: '#818cf8', trainings: 176, streak: 9,  volume: 44600, duration: 198 },

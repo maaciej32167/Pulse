@@ -21,6 +21,7 @@
 - **Przy prostych, jednoznacznych poleceniach** — działaj od razu bez pytania
 - Testy: `npx expo start --tunnel` → Expo Go na telefonie
 - PWA (`/Users/maciejgierlik/Documents/Aplikacje/sila/index.html`) działa niezależnie
+- **`git commit` i `git push` — TYLKO na wyraźne polecenie użytkownika. Nigdy automatycznie po wprowadzeniu zmian.**
 
 ## Zasady struktury danych (AsyncStorage → Backend)
 

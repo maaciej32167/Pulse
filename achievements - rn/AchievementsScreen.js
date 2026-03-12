@@ -18,7 +18,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ACHIEVEMENTS, CATEGORIES, RARITY, getCollectionStats,
 } from '../src/achievements';
-import ScreenHeader from '../components/ScreenHeader';
 
 // ─── Kolory ───────────────────────────────────────────────────────────────
 const C = {
@@ -249,15 +248,12 @@ function DetailModal({ achievement, unlocked, progress, visible, onClose }) {
 
 // ─── MAIN SCREEN ──────────────────────────────────────────────────────────
 export default function AchievementsScreen({ navigation }) {
-  const [selectedCat,    setSelectedCat]    = useState('all');
-  const [selectedRarity, setSelectedRarity] = useState('all');
-  const [unlockedIds,    setUnlockedIds]    = useState([]);
-  const [progressMap,    setProgressMap]    = useState({});
-  const [selectedAch,    setSelectedAch]    = useState(null);
-  const [modalVisible,   setModalVisible]   = useState(false);
-  const [showLocked,     setShowLocked]     = useState(false);
-  const catScrollRef    = React.useRef(null);
-  const rarityScrollRef = React.useRef(null);
+  const [selectedCat, setSelectedCat]   = useState('all');
+  const [unlockedIds, setUnlockedIds]   = useState([]);
+  const [progressMap, setProgressMap]   = useState({});
+  const [selectedAch, setSelectedAch]   = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [showLocked, setShowLocked]     = useState(false); // true = tylko niezdobyte
 
   // Wczytaj odblokowane achievementy z AsyncStorage
   useEffect(() => {
@@ -281,7 +277,6 @@ export default function AchievementsScreen({ navigation }) {
   // Filtrowanie
   const visibleAch = ACHIEVEMENTS
     .filter(a => selectedCat === 'all' || a.category === selectedCat)
-    .filter(a => selectedRarity === 'all' || a.rarity === selectedRarity)
     .filter(a => !showLocked || !unlockedIds.includes(a.id))
     .sort((a, b) => {
       const ua = unlockedIds.includes(a.id);
@@ -318,7 +313,14 @@ export default function AchievementsScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
 
-      <ScreenHeader navigation={navigation} icon="award" label="ACHIEV." color="#fbbf24" />
+      {/* HEADER */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Feather name="arrow-left" size={20} color={C.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Achievementy</Text>
+        <View style={{ width: 36 }} />
+      </View>
 
       <FlatList
         data={visibleAch}
@@ -327,7 +329,7 @@ export default function AchievementsScreen({ navigation }) {
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.columnWrapper}
         showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
+        ListHeaderComponent={() => (
           <View>
             {/* STATS BAR */}
             <View style={styles.statsBar}>
@@ -354,37 +356,27 @@ export default function AchievementsScreen({ navigation }) {
               </View>
             </View>
 
-            {/* RARITY BREAKDOWN — klikalne, filtrują listę */}
+            {/* RARITY BREAKDOWN */}
             <ScrollView
-              ref={rarityScrollRef}
               horizontal
               showsHorizontalScrollIndicator={false}
               style={styles.rarityScroll}
               contentContainerStyle={styles.rarityRow}
             >
               {Object.entries(RARITY).map(([key, r]) => {
-                const got     = stats.byRarity[key]?.unlocked ?? 0;
-                const total   = stats.byRarity[key]?.total ?? 0;
-                const active  = selectedRarity === key;
+                const got   = stats.byRarity[key]?.unlocked ?? 0;
+                const total = stats.byRarity[key]?.total ?? 0;
                 return (
-                  <TouchableOpacity
-                    key={key}
-                    onPress={() => setSelectedRarity(active ? 'all' : key)}
-                    style={[
-                      styles.rarityChip,
-                      { borderColor: active ? r.color : r.color + '44', backgroundColor: active ? r.color + '22' : undefined },
-                    ]}
-                  >
+                  <View key={key} style={[styles.rarityChip, { borderColor: r.color + '44' }]}>
                     <Text style={[styles.rarityChipLabel, { color: r.color }]}>{r.label}</Text>
                     <Text style={styles.rarityChipCount}>{got}/{total}</Text>
-                  </TouchableOpacity>
+                  </View>
                 );
               })}
             </ScrollView>
 
             {/* CATEGORY TABS */}
             <ScrollView
-              ref={catScrollRef}
               horizontal
               showsHorizontalScrollIndicator={false}
               style={styles.tabScroll}
@@ -394,7 +386,10 @@ export default function AchievementsScreen({ navigation }) {
                 <TouchableOpacity
                   key={cat.id}
                   onPress={() => setSelectedCat(cat.id)}
-                  style={[styles.tab, selectedCat === cat.id && styles.tabActive]}
+                  style={[
+                    styles.tab,
+                    selectedCat === cat.id && styles.tabActive,
+                  ]}
                 >
                   <Text style={[styles.tabText, selectedCat === cat.id && { color: C.red }]}>
                     {cat.icon} {cat.label}
@@ -416,7 +411,7 @@ export default function AchievementsScreen({ navigation }) {
               </TouchableOpacity>
             </View>
           </View>
-        }
+        )}
         renderItem={renderCard}
       />
 
