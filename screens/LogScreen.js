@@ -112,7 +112,7 @@ export default function LogScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenHeader navigation={navigation} icon="zap" label="NOWY TRENING" color={C.coral} />
+      <ScreenHeader navigation={navigation} icon="zap" label="TRENING" color={C.coral} />
 
       {/* Search */}
       <View style={styles.searchWrap}>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -118,6 +118,24 @@ export default function SummaryScreen({ navigation, route }) {
   function handleSave() {
     clearWorkout();
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+  }
+
+  function handleDiscard() {
+    Alert.alert(
+      'Odrzuć trening?',
+      'Trening nie zostanie zapisany w historii.',
+      [
+        { text: 'Anuluj', style: 'cancel' },
+        {
+          text: 'Odrzuć',
+          style: 'destructive',
+          onPress: () => {
+            clearWorkout();
+            navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+          },
+        },
+      ]
+    );
   }
 
   return (
@@ -278,7 +296,11 @@ export default function SummaryScreen({ navigation, route }) {
 
         {/* CTA */}
         <TouchableOpacity style={styles.doneBtn} onPress={handleSave} activeOpacity={0.8}>
-          <Text style={styles.doneBtnText}>ZAPISZ I WRÓĆ</Text>
+          <Text style={styles.doneBtnText}>ZAPISZ</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.discardBtn} onPress={handleDiscard} activeOpacity={0.7}>
+          <Text style={styles.discardBtnText}>Odrzuć trening</Text>
         </TouchableOpacity>
 
         <View style={{ height: 32 }} />
@@ -417,4 +439,6 @@ const styles = StyleSheet.create({
     shadowColor: C.coral, shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
   },
   doneBtnText: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 3 },
+  discardBtn: { alignItems: 'center', paddingVertical: 14 },
+  discardBtnText: { color: C.muted, fontSize: 13, fontWeight: '600' },
 });

@@ -5,7 +5,7 @@ import {
   Alert, Modal, FlatList,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { loadExercises, loadRecords, saveRecords, loadBodyWeight, loadBWExercises } from '../src/storage';
 import { estimate1RM, round1, effectiveWeight } from '../src/utils';
 import { generateUUID as generateId, isoDate, displayDate } from '../src/storage';
@@ -76,6 +76,7 @@ export default function WorkoutScreen({ navigation, route }) {
   const workoutId = useRef(generateId()).current; // stable per session
   const pausedAtRef = useRef(null); // synchronous pause timestamp (avoids batching issues)
   const { activeWorkout, startWorkout, updateSets, pauseWorkout, resumeWorkout, setWorkoutScreenVisible } = useWorkout();
+  const insets = useSafeAreaInsets();
   const { label: timerLabel } = useTimer(
     activeWorkout?.startTime ?? checkInTime,
     activeWorkout?.pausedAt ?? null,
@@ -91,6 +92,7 @@ export default function WorkoutScreen({ navigation, route }) {
   const [bwExercises, setBwExercises] = useState(new Set());
   const [live1RM, setLive1RM] = useState(null);
   const [toast, setToast] = useState('');
+  const [prBanner, setPrBanner] = useState(null); // { exercise, orm }
   const [pickerVisible, setPickerVisible] = useState(false);
   const [activeField, setActiveField] = useState(null);
   const [editingSet, setEditingSet] = useState(null); // { set, editWeight, editReps, activeField }
@@ -193,7 +195,12 @@ export default function WorkoutScreen({ navigation, route }) {
     setWeight('');
     setReps('');
     setActiveField(null);
-    showToast(isPR ? `🏆 Nowy PR! 1RM ≈ ${round1(newOrm)} kg` : '✅ Zapisano');
+    if (isPR) {
+      setPrBanner({ exercise: selectedEx, orm: round1(newOrm) });
+      setTimeout(() => setPrBanner(null), 3500);
+    } else {
+      showToast('✅ Zapisano');
+    }
   }
 
   function deleteSet(id) {
@@ -241,28 +248,16 @@ export default function WorkoutScreen({ navigation, route }) {
   }
 
   function handleFinish() {
-    Alert.alert(
-      'Zakończyć trening?',
-      `Zapisano ${sessionSets.length} serii.`,
-      [
-        { text: 'Kontynuuj', style: 'cancel' },
-        {
-          text: 'Zakończ',
-          onPress: () => {
-            const endTime = Date.now();
-            pausedAtRef.current = endTime; // synchronous — guaranteed before useFocusEffect reads it
-            pauseWorkout();
-            navigation.navigate('Summary', {
-              gym,
-              startTime: checkInTime,
-              endTime,
-              sets: sessionSets,
-              allRecords: records,
-            });
-          },
-        },
-      ]
-    );
+    const endTime = Date.now();
+    pausedAtRef.current = endTime;
+    pauseWorkout();
+    navigation.navigate('Summary', {
+      gym,
+      startTime: checkInTime,
+      endTime,
+      sets: sessionSets,
+      allRecords: records,
+    });
   }
 
   const isBW = bwExercises.has(selectedEx);
@@ -302,7 +297,12 @@ export default function WorkoutScreen({ navigation, route }) {
             <View style={styles.timerDot} />
             <Text style={styles.timerText}>{timerLabel}</Text>
           </View>
-          {!!gym?.name && <Text style={styles.gymLabel} numberOfLines={1}>{gym.name}</Text>}
+          {!!gym?.name && (
+            <View style={styles.gymRow}>
+              <Text style={styles.gymPin}>📍</Text>
+              <Text style={styles.gymLabel} numberOfLines={1}>{gym.name}</Text>
+            </View>
+          )}
         </View>
         <TouchableOpacity style={styles.finishBtn} onPress={handleFinish} activeOpacity={0.8}>
           <Text style={styles.finishBtnText}>Zakończ</Text>
@@ -505,6 +505,19 @@ export default function WorkoutScreen({ navigation, route }) {
           <Text style={styles.toastText}>{toast}</Text>
         </View>
       )}
+
+      {!!prBanner && (
+        <View style={[styles.prBannerWrap, { top: insets.top + 12 }]}>
+          <View style={styles.prBannerInner}>
+            <Text style={styles.prBannerTrophy}>🏆</Text>
+            <View style={styles.prBannerText}>
+              <Text style={styles.prBannerTitle}>NOWY REKORD!</Text>
+              <Text style={styles.prBannerSub} numberOfLines={1}>{prBanner.exercise}</Text>
+            </View>
+            <Text style={styles.prBannerOrm}>1RM ≈ {prBanner.orm} kg</Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -526,7 +539,9 @@ const styles = StyleSheet.create({
   timerWrap:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
   timerDot:     { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#22c55e' },
   timerText:    { color: C.txt, fontSize: 20, fontWeight: '800', letterSpacing: 2, fontVariant: ['tabular-nums'] },
-  gymLabel:     { color: C.muted, fontSize: 11, letterSpacing: 1, marginTop: 2 },
+  gymRow:       { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
+  gymPin:       { fontSize: 10 },
+  gymLabel:     { color: C.muted, fontSize: 11, letterSpacing: 1 },
   finishBtn: {
     paddingHorizontal: 14, paddingVertical: 8,
     backgroundColor: 'rgba(255,71,87,0.15)',
@@ -618,6 +633,23 @@ const styles = StyleSheet.create({
     borderRadius: 20, borderWidth: 1, borderColor: C.border,
   },
   toastText: { color: C.txt, fontSize: 14 },
+
+  prBannerWrap: {
+    position: 'absolute', left: 16, right: 16,
+    borderRadius: 16, overflow: 'hidden',
+    shadowColor: '#FFD700', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 4 },
+  },
+  prBannerInner: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#1a1500',
+    borderWidth: 1, borderColor: '#FFD70066',
+    borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14,
+  },
+  prBannerTrophy:  { fontSize: 32 },
+  prBannerText:    { flex: 1 },
+  prBannerTitle:   { color: '#FFD700', fontSize: 13, fontWeight: '900', letterSpacing: 2 },
+  prBannerSub:     { color: 'rgba(255,215,0,0.6)', fontSize: 12, fontWeight: '600', marginTop: 2 },
+  prBannerOrm:     { color: '#FFD700', fontSize: 15, fontWeight: '800' },
 });
 
 const kbStyles = StyleSheet.create({
