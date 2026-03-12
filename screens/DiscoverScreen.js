@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import ScreenHeader from '../components/ScreenHeader';
+import UserAvatar from '../components/UserAvatar';
 
 // ─── design tokens ────────────────────────────────────────────────────────────
 
@@ -100,14 +101,9 @@ function UserCard({ user }) {
 
   return (
     <View style={styles.userCard}>
-      <View style={[styles.avatar, { backgroundColor: user.color + '22', borderColor: user.color + '55' }]}>
-        <Text style={[styles.avatarText, { color: user.color }]}>{user.initials}</Text>
-      </View>
+      <UserAvatar initials={user.initials} level={user.level} color={user.color} size="md" style={{ marginRight: 0 }} />
       <View style={styles.userInfo}>
         <Text style={styles.userName}>{user.name}</Text>
-        <View style={styles.userMeta}>
-          <Text style={styles.userLevel}>LVL {user.level}</Text>
-        </View>
         <Text style={styles.userVolume}>{user.volume}</Text>
         <View style={styles.userActions}>
           <TouchableOpacity
@@ -365,15 +361,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     gap: 12,
   },
-  avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { fontSize: 15, fontWeight: '800', letterSpacing: 1 },
   userInfo: { flex: 1 },
   userName: { color: C.txt, fontSize: 14, fontWeight: '700', letterSpacing: 0.3 },
   userMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
@@ -385,7 +372,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.03)',
   },
   klassText: { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  userLevel: { color: C.muted, fontSize: 11, fontWeight: '600', letterSpacing: 1 },
   userVolume: { color: C.muted, fontSize: 11, marginTop: 3 },
   userActions: {
     flexDirection: 'row',

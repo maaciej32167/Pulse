@@ -13,6 +13,7 @@ import { Image } from 'react-native';
 import {
   loadRecords, loadBodyWeight, loadBWExercises, loadProfile, saveProfile, loadAchievements,
 } from '../src/storage';
+import UserAvatar from '../components/UserAvatar';
 import { getCollectionStats } from '../src/achievements';
 import ScreenHeader from '../components/ScreenHeader';
 import { estimate1RM, round1, effectiveWeight } from '../src/utils';
@@ -355,16 +356,13 @@ function ProfileHero({ profile, records, achievementXP, onEditPress }) {
   return (
     <View style={styles.hero}>
       {/* Left: avatar */}
-      <TouchableOpacity style={styles.avatarWrap} onPress={onEditPress} activeOpacity={0.85}>
-        {profile.photo
-          ? <Image source={{ uri: profile.photo }} style={styles.avatarImg} />
-          : <View style={styles.avatarBox}>
-              <Feather name="user" size={28} color={C.muted} />
-            </View>
-        }
-        <View style={styles.levelBadge}>
-          <Text style={styles.levelBadgeText}>{level}</Text>
-        </View>
+      <TouchableOpacity onPress={onEditPress} activeOpacity={0.85} style={{ marginRight: 14 }}>
+        <UserAvatar
+          initials={(profile.name || '?').slice(0, 2).toUpperCase()}
+          photo={profile.photo}
+          level={level}
+          size="lg"
+        />
       </TouchableOpacity>
 
       {/* Right: info */}
@@ -1922,22 +1920,6 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 14, right: 18,
     flexDirection: 'row', alignItems: 'center', gap: 14,
   },
-  avatarWrap: { position: 'relative', marginRight: 14 },
-  avatarImg: {
-    width: 62, height: 62, borderRadius: 18,
-    borderWidth: 2, borderColor: `${RED}44`,
-  },
-  avatarBox: {
-    width: 62, height: 62, borderRadius: 18,
-    backgroundColor: '#181a2e', borderWidth: 2, borderColor: `${RED}44`,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  levelBadge: {
-    position: 'absolute', bottom: -7, right: -7,
-    backgroundColor: RED, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2,
-    borderWidth: 2, borderColor: C.bg,
-  },
-  levelBadgeText: { color: '#fff', fontSize: 10, fontWeight: '900' },
   heroInfo:  { flex: 1 },
   heroName:  { color: C.txt, fontSize: 18, fontWeight: '800', letterSpacing: -0.3, marginBottom: 2 },
   heroClass: { fontSize: 11, fontWeight: '700', marginBottom: 2 },

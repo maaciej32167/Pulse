@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import ScreenHeader from '../components/ScreenHeader';
+import UserAvatar from '../components/UserAvatar';
 import { COLORS } from '../src/colors';
 
 // ─── design tokens ────────────────────────────────────────────────────────────
@@ -178,9 +179,7 @@ function SectionTitle({ label, icon, count }) {
 function CheckInCard({ person }) {
   return (
     <View style={styles.checkInCard}>
-      <View style={[styles.avatar, { backgroundColor: person.color + '22', borderColor: person.color + '55' }]}>
-        <Text style={[styles.avatarText, { color: person.color }]}>{person.initials}</Text>
-      </View>
+      <UserAvatar initials={person.initials} level={person.level} color={person.color} size="md" />
       <View style={styles.checkInInfo}>
         <Text style={styles.personName}>{person.name}</Text>
         <Text style={styles.doingText}>{person.doing}</Text>
@@ -212,12 +211,9 @@ function RegularCard({ person, rank, sortKey }) {
   return (
     <View style={styles.regularCard}>
       <Text style={styles.rank}>#{rank}</Text>
-      <View style={[styles.avatar, { backgroundColor: person.color + '22', borderColor: person.color + '55' }]}>
-        <Text style={[styles.avatarText, { color: person.color }]}>{person.initials}</Text>
-      </View>
+      <UserAvatar initials={person.initials} level={person.level} color={person.color} size="md" />
       <View style={styles.regularInfo}>
         <Text style={styles.personName}>{person.name}</Text>
-        <Text style={styles.personLevel}>LVL {person.level}</Text>
       </View>
       <View style={styles.regularStats}>
         <Text style={styles.regularTrainings}>{metricVal}</Text>
@@ -466,13 +462,10 @@ const styles = StyleSheet.create({
   streakText:       { color: C.gold, fontSize: 10, fontWeight: '700' },
 
   // Shared
-  avatar:        { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  avatarText:    { fontSize: 14, fontWeight: '800', letterSpacing: 1 },
   personName:    { color: C.txt, fontSize: 14, fontWeight: '700' },
   klassBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   klassBadge:    { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1, backgroundColor: 'rgba(255,255,255,0.03)' },
   klassText:     { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  personLevel:   { color: C.muted, fontSize: 11, fontWeight: '600', letterSpacing: 1 },
 
   // My gym card
   myCard: {
