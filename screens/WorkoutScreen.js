@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   Alert, Modal, FlatList,
@@ -8,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { loadExercises, loadRecords, saveRecords, loadBodyWeight, loadBWExercises } from '../src/storage';
 import { estimate1RM, round1, effectiveWeight } from '../src/utils';
 import { generateUUID as generateId, isoDate, displayDate } from '../src/storage';
+import { useWorkout } from '../src/WorkoutContext';
 
 // ─── design tokens ────────────────────────────────────────────────────────────
 
@@ -18,15 +20,15 @@ const C = {
 
 // ─── timer ────────────────────────────────────────────────────────────────────
 
-function useTimer(startTime) {
-  const [elapsed, setElapsed] = useState(Math.floor((Date.now() - startTime) / 1000));
+function useTimer(startTime, pausedAt) {
+  const calc = () => Math.floor(((pausedAt || Date.now()) - startTime) / 1000);
+  const [elapsed, setElapsed] = useState(calc);
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startTime) / 1000));
-    }, 1000);
+    if (pausedAt) { setElapsed(calc()); return; }
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - startTime) / 1000)), 1000);
     return () => clearInterval(id);
-  }, [startTime]);
+  }, [startTime, pausedAt]);
 
   const h = Math.floor(elapsed / 3600);
   const m = Math.floor((elapsed % 3600) / 60);
@@ -72,7 +74,11 @@ function CustomKeypad({ showDot, onKey }) {
 export default function WorkoutScreen({ navigation, route }) {
   const { gym, checkInTime } = route.params;
   const workoutId = useRef(generateId()).current; // stable per session
-  const { label: timerLabel } = useTimer(checkInTime);
+  const { label: timerLabel } = useTimer(
+    activeWorkout?.startTime ?? checkInTime,
+    activeWorkout?.pausedAt ?? null,
+  );
+  const { activeWorkout, startWorkout, updateSets, pauseWorkout, resumeWorkout, setWorkoutScreenVisible } = useWorkout();
 
   const [exercises, setExercises] = useState([]);
   const [records,   setRecords]   = useState([]);
@@ -89,7 +95,14 @@ export default function WorkoutScreen({ navigation, route }) {
   const [editingSet, setEditingSet] = useState(null); // { set, editWeight, editReps, activeField }
   const [editActiveField, setEditActiveField] = useState(null);
 
+  useFocusEffect(useCallback(() => {
+    setWorkoutScreenVisible(true);
+    resumeWorkout();
+    return () => setWorkoutScreenVisible(false);
+  }, []));
+
   useEffect(() => {
+    startWorkout(gym, checkInTime);
     async function init() {
       const ex  = await loadExercises();
       const rec = await loadRecords();
@@ -103,6 +116,10 @@ export default function WorkoutScreen({ navigation, route }) {
     }
     init();
   }, []);
+
+  useEffect(() => {
+    updateSets(sessionSets, records);
+  }, [sessionSets]);
 
   useEffect(() => {
     const w = parseFloat(weight);
@@ -228,10 +245,12 @@ export default function WorkoutScreen({ navigation, route }) {
         {
           text: 'Zakończ',
           onPress: () => {
+            const endTime = Date.now();
+            pauseWorkout();
             navigation.navigate('Summary', {
               gym,
               startTime: checkInTime,
-              endTime: Date.now(),
+              endTime,
               sets: sessionSets,
               allRecords: records,
             });

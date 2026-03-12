@@ -1,10 +1,12 @@
-import { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { round1 } from '../src/utils';
 import { loadAchievements, saveAchievements, loadBodyWeight, loadProfile } from '../src/storage';
 import { computeAchievementsFromRecords } from '../src/achievements';
+import { useWorkout } from '../src/WorkoutContext';
 
 // ─── design tokens ────────────────────────────────────────────────────────────
 
@@ -52,6 +54,21 @@ function StatBox({ icon, value, label, color }) {
 
 export default function SummaryScreen({ navigation, route }) {
   const { gym, startTime, endTime, sets, allRecords } = route.params;
+  const { clearWorkout } = useWorkout();
+  const [isPublic,     setIsPublic]     = useState(true);
+  const [title,        setTitle]        = useState('');
+  const [photo,        setPhoto]        = useState(null);
+  const [description,  setDescription]  = useState('');
+
+  async function pickPhoto() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true, aspect: [4, 3], quality: 0.8,
+    });
+    if (!result.canceled) setPhoto(result.assets[0].uri);
+  }
 
   useEffect(() => {
     async function checkAndSaveAchievements() {
@@ -98,25 +115,48 @@ export default function SummaryScreen({ navigation, route }) {
     map.get(s.exercise).push(s);
   }
 
-  function handleDone() {
+  function handleSave() {
+    clearWorkout();
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   }
 
   return (
     <SafeAreaView style={styles.safe}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12}>
+          <Feather name="chevron-left" size={26} color="rgba(255,255,255,0.5)" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Podsumowanie</Text>
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.8}>
+          <Text style={styles.saveBtnText}>Zapisz</Text>
+        </TouchableOpacity>
+      </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
+        {/* Tytuł treningu */}
+        <TextInput
+          style={styles.titleInput}
+          placeholder="Nazwa treningu (opcjonalnie)"
+          placeholderTextColor={C.muted}
+          value={title}
+          onChangeText={setTitle}
+          maxLength={60}
+        />
 
         {/* Hero */}
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Feather name="check-circle" size={40} color={C.green} />
+            <Feather name="check-circle" size={20} color={C.green} />
           </View>
-          <Text style={styles.heroTitle}>TRENING UKOŃCZONY</Text>
-          <View style={styles.heroMeta}>
-            {!!gym?.name && <Text style={styles.heroPin}>📍</Text>}
-            {!!gym?.name && <Text style={styles.heroGym}>{gym.name}</Text>}
-            {!!gym?.name && <View style={styles.heroDot} />}
-            <Text style={styles.heroTime}>{formatTime(startTime)} – {formatTime(endTime)}</Text>
+          <View style={styles.heroText}>
+            <Text style={styles.heroTitle}>TRENING UKOŃCZONY</Text>
+            <View style={styles.heroMeta}>
+              {!!gym?.name && <Text style={styles.heroPin}>📍</Text>}
+              {!!gym?.name && <Text style={styles.heroGym}>{gym.name}</Text>}
+              {!!gym?.name && <View style={styles.heroDot} />}
+              <Text style={styles.heroTime}>{formatTime(startTime)} – {formatTime(endTime)}</Text>
+            </View>
           </View>
         </View>
 
@@ -175,9 +215,70 @@ export default function SummaryScreen({ navigation, route }) {
           })}
         </View>
 
+        {/* Zdjęcie + opis */}
+        <View style={styles.postCard}>
+          <TouchableOpacity style={styles.photoArea} onPress={pickPhoto} activeOpacity={0.8}>
+            {photo
+              ? <Image source={{ uri: photo }} style={styles.photoPreview} resizeMode="cover" />
+              : <>
+                  <Feather name="camera" size={22} color={C.muted} />
+                  <Text style={styles.photoHint}>Dodaj zdjęcie</Text>
+                </>
+            }
+            {photo && (
+              <TouchableOpacity style={styles.photoRemove} onPress={() => setPhoto(null)}>
+                <Feather name="x" size={14} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </TouchableOpacity>
+          <TextInput
+            style={styles.descInput}
+            placeholder="Jak poszło? Dodaj opis…"
+            placeholderTextColor={C.muted}
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            maxLength={300}
+          />
+          {description.length > 0 && (
+            <Text style={styles.descCount}>{description.length}/300</Text>
+          )}
+        </View>
+
+        {/* Widoczność */}
+        <View style={styles.privacyCard}>
+          <View style={styles.privacyHeader}>
+            <Feather name={isPublic ? 'globe' : 'lock'} size={14} color={isPublic ? C.cyan : C.muted} />
+            <Text style={styles.privacyTitle}>WIDOCZNOŚĆ TRENINGU</Text>
+          </View>
+          <View style={styles.privacyToggle}>
+            <TouchableOpacity
+              style={[styles.privacyOption, isPublic && styles.privacyOptionActive]}
+              onPress={() => setIsPublic(true)}
+              activeOpacity={0.8}
+            >
+              <Feather name="globe" size={13} color={isPublic ? C.cyan : C.muted} />
+              <Text style={[styles.privacyOptionText, isPublic && { color: C.cyan }]}>Publiczny</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.privacyOption, !isPublic && styles.privacyOptionActivePriv]}
+              onPress={() => setIsPublic(false)}
+              activeOpacity={0.8}
+            >
+              <Feather name="lock" size={13} color={!isPublic ? C.muted : C.muted} />
+              <Text style={[styles.privacyOptionText, !isPublic && { color: C.txt }]}>Prywatny</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.privacyHint}>
+            {isPublic
+              ? 'Trening pojawi się na wallu znajomych'
+              : 'Tylko Ty widzisz ten trening'}
+          </Text>
+        </View>
+
         {/* CTA */}
-        <TouchableOpacity style={styles.doneBtn} onPress={handleDone} activeOpacity={0.8}>
-          <Text style={styles.doneBtnText}>WRÓĆ DO MENU</Text>
+        <TouchableOpacity style={styles.doneBtn} onPress={handleSave} activeOpacity={0.8}>
+          <Text style={styles.doneBtnText}>ZAPISZ I WRÓĆ</Text>
         </TouchableOpacity>
 
         <View style={{ height: 32 }} />
@@ -190,57 +291,125 @@ export default function SummaryScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   safe:    { flex: 1, backgroundColor: C.bg },
-  content: { padding: 16 },
+  content: { padding: 12 },
 
-  hero: { alignItems: 'center', paddingVertical: 32 },
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 12, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+    gap: 8,
+  },
+  headerTitle: { flex: 1, color: C.txt, fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  saveBtn: {
+    backgroundColor: C.coral, borderRadius: 10,
+    paddingHorizontal: 16, paddingVertical: 7,
+  },
+  saveBtnText: { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 0.3 },
+
+  hero: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 12, paddingHorizontal: 4, marginBottom: 8,
+  },
   heroIcon: {
-    width: 80, height: 80, borderRadius: 40,
-    backgroundColor: C.green + '18', borderWidth: 1.5, borderColor: C.green + '55',
-    alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: C.green + '18', borderWidth: 1, borderColor: C.green + '44',
+    alignItems: 'center', justifyContent: 'center',
   },
-  heroTitle: { color: C.txt, fontSize: 22, fontWeight: '900', letterSpacing: 4, textTransform: 'uppercase' },
-  heroMeta:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
-  heroPin:   { fontSize: 12 },
-  heroGym:   { color: C.txt, fontSize: 14, fontWeight: '700' },
-  heroDot:   { width: 3, height: 3, borderRadius: 1.5, backgroundColor: '#6b7f93', opacity: 0.8 },
-  heroTime:  { color: '#99aabb', fontSize: 13 },
+  heroText:  { flex: 1 },
+  heroTitle: { color: C.txt, fontSize: 14, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase' },
+  heroMeta:  { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
+  heroPin:   { fontSize: 10 },
+  heroGym:   { color: C.muted, fontSize: 11, fontWeight: '700' },
+  heroDot:   { width: 2, height: 2, borderRadius: 1, backgroundColor: '#6b7f93' },
+  heroTime:  { color: C.muted, fontSize: 11 },
 
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  statsGrid: { flexDirection: 'row', gap: 6, marginBottom: 8 },
   statBox: {
-    flex: 1, minWidth: '45%',
+    flex: 1,
     backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
-    borderRadius: 12, padding: 11, gap: 4,
+    borderRadius: 10, padding: 9, gap: 3,
   },
-  statRow:   { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  statValue: { fontSize: 17, fontWeight: '800' },
-  statLabel: { color: C.muted, fontSize: 10, letterSpacing: 0.3 },
+  statRow:   { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  statValue: { fontSize: 14, fontWeight: '800' },
+  statLabel: { color: C.muted, fontSize: 9, letterSpacing: 0.2 },
 
   card: {
     backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+    borderRadius: 12, padding: 12, marginBottom: 8,
+  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  cardTitle:  { color: C.muted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 },
+
+  prRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)' },
+  prEx:   { color: C.txt, fontSize: 12 },
+  prVal:  { color: C.gold, fontSize: 12, fontWeight: '700' },
+
+  exGroup:   { marginTop: 7 },
+  exHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
+  exName:    { color: C.txt, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  prBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: '#FFD70020', borderWidth: 1, borderColor: '#FFD70066',
+    borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2,
+  },
+  prBadgeText: { color: '#FFD700', fontSize: 9, fontWeight: '800' },
+  setRow:        { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)' },
+  setNum:        { color: C.muted, fontSize: 11, width: 16, textAlign: 'center' },
+  setWeightReps: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
+  setWeight:     { color: C.coral, fontSize: 12, fontWeight: '700' },
+  setX:          { color: C.muted, fontSize: 11 },
+  setReps:       { color: C.txt, fontSize: 12 },
+
+  titleInput: {
+    backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11,
+    color: C.txt, fontSize: 16, fontWeight: '800', marginBottom: 8,
+  },
+
+  postCard: {
+    backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+    borderRadius: 12, overflow: 'hidden', marginBottom: 8,
+  },
+  photoArea: {
+    height: 110, backgroundColor: 'rgba(255,255,255,0.03)',
+    borderBottomWidth: 1, borderBottomColor: C.border,
+    alignItems: 'center', justifyContent: 'center', gap: 6,
+  },
+  photoPreview: { width: '100%', height: '100%' },
+  photoHint:   { color: C.muted, fontSize: 11, fontWeight: '600' },
+  photoRemove: {
+    position: 'absolute', top: 7, right: 7,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10,
+    width: 22, height: 22, alignItems: 'center', justifyContent: 'center',
+  },
+  descInput: {
+    color: C.txt, fontSize: 13, padding: 12, minHeight: 55,
+    textAlignVertical: 'top',
+  },
+  descCount: { color: C.muted, fontSize: 10, textAlign: 'right', paddingRight: 12, paddingBottom: 6 },
+
+  privacyCard: {
+    backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
     borderRadius: 16, padding: 16, marginBottom: 12,
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  cardTitle:  { color: C.muted, fontSize: 11, fontWeight: '800', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 10 },
-
-  prRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)' },
-  prEx:   { color: C.txt, fontSize: 13 },
-  prVal:  { color: C.gold, fontSize: 13, fontWeight: '700' },
-
-  exGroup:   { marginTop: 10 },
-  exHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  exName:    { color: C.txt, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  prBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#FFD70020', borderWidth: 1, borderColor: '#FFD70066',
-    borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3,
+  privacyHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  privacyTitle:  { color: C.muted, fontSize: 11, fontWeight: '800', letterSpacing: 3, textTransform: 'uppercase' },
+  privacyToggle: {
+    flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 10, padding: 3, gap: 3, marginBottom: 10,
   },
-  prBadgeText: { color: '#FFD700', fontSize: 10, fontWeight: '800' },
-  setRow:        { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)' },
-  setNum:        { color: C.muted, fontSize: 12, width: 18, textAlign: 'center' },
-  setWeightReps: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  setWeight:     { color: C.coral, fontSize: 13, fontWeight: '700' },
-  setX:          { color: C.muted, fontSize: 12 },
-  setReps:       { color: C.txt, fontSize: 13 },
+  privacyOption: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 9, borderRadius: 8,
+  },
+  privacyOptionActive: {
+    backgroundColor: C.cyan + '18', borderWidth: 1, borderColor: C.cyan + '44',
+  },
+  privacyOptionActivePriv: {
+    backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+  },
+  privacyOptionText: { color: C.muted, fontSize: 13, fontWeight: '700' },
+  privacyHint: { color: C.muted, fontSize: 11, textAlign: 'center' },
 
   doneBtn: {
     backgroundColor: C.coral, borderRadius: 14,

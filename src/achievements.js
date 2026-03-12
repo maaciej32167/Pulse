@@ -1145,6 +1145,19 @@ export function computeAchievementsFromRecords(records = [], profile = {}, bodyW
   // Bez litości — 7 dni z rzędu (to samo co streak_7, ale secret)
   if (bestStreak >= 7) unlock('secret_no_rest');
 
+  // Pełnia — trening w noc pełni księżyca
+  // Algorytm: znana pełnia 6 stycznia 2000, 18:14 UTC + okres synodyczny 29.53059 dni
+  // Faza 0 = nów, 0.5 = pełnia; okno ±1.5 dnia (~0.051 cyklu)
+  const FULL_MOON_REF_MS = 947182440000; // 2000-01-06T18:14:00Z
+  const SYNODIC_MS = 29.53059 * 86400000;
+  const hasFullMoon = records.some(r => {
+    if (!r.timestamp) return false;
+    const elapsed = r.timestamp - FULL_MOON_REF_MS;
+    const phase = ((elapsed % SYNODIC_MS) + SYNODIC_MS) % SYNODIC_MS / SYNODIC_MS;
+    return Math.abs(phase - 0.5) < 0.051; // ±1.5 dnia od pełni
+  });
+  if (hasFullMoon) unlock('secret_full_moon');
+
   return { newlyUnlocked, progress };
 }
 
