@@ -125,6 +125,8 @@ function migrateRecord(r) {
     bodyWeightKg: r.bodyWeightKg || 80,
     gymId:        r.gymId        || null,
     gymName:      r.gymName      || null,
+    isPR:         r.isPR         || false,
+    prTypes:      r.prTypes      || (r.isPR ? ['orm'] : []), // legacy: treat old isPR as 1RM PR
   };
 }
 

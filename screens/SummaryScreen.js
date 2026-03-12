@@ -8,6 +8,13 @@ import { loadAchievements, saveAchievements, loadBodyWeight, loadProfile } from 
 import { computeAchievementsFromRecords } from '../src/achievements';
 import { useWorkout } from '../src/WorkoutContext';
 
+const PR_LABEL_SUMMARY = {
+  weight:        'MAX CIĘŻAR',
+  orm:           'BEST 1RM',
+  setVolume:     'VOL SETU',
+  sessionVolume: 'VOL SESJI',
+};
+
 // ─── design tokens ────────────────────────────────────────────────────────────
 
 const C = {
@@ -98,14 +105,32 @@ export default function SummaryScreen({ navigation, route }) {
   const exercises = [...new Set(sets.map(s => s.exercise))];
   const totalVolume = sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
 
-  // Sprawdź PR-y w tej sesji
-  const prs = sets.filter(s => {
-    const prev = allRecords.filter(r => r.exercise === s.exercise && r.id !== s.id);
-    if (prev.length === 0) return true;
-    const best = Math.max(...prev.map(r => r.weight * (36 / (37 - Math.min(r.reps, 36)))));
-    const current = s.weight * (36 / (37 - Math.min(s.reps, 36)));
-    return current > best;
-  });
+  // PR-y — grupuj po ćwiczeniu, zbierz najlepsze wartości per typ
+  const prByExercise = {};
+  for (const s of sets) {
+    if (!s.isPR || !s.prTypes?.length) continue;
+    if (!prByExercise[s.exercise]) prByExercise[s.exercise] = { types: new Set(), maxWeight: 0, maxOrm: 0, maxSetVol: 0 };
+    const entry = prByExercise[s.exercise];
+    s.prTypes.forEach(t => entry.types.add(t));
+    entry.maxWeight = Math.max(entry.maxWeight, s.weight);
+    const orm = s.weight * (36 / (37 - Math.min(s.reps, 36)));
+    entry.maxOrm = Math.max(entry.maxOrm, orm);
+    entry.maxSetVol = Math.max(entry.maxSetVol, s.weight * s.reps);
+  }
+  // session volume per exercise
+  const sessionVolByEx = {};
+  for (const s of sets) {
+    sessionVolByEx[s.exercise] = (sessionVolByEx[s.exercise] || 0) + s.weight * s.reps;
+  }
+  const prExercises = Object.entries(prByExercise).map(([exercise, data]) => ({
+    exercise,
+    types: [...data.types],
+    maxWeight: data.maxWeight,
+    maxOrm: data.maxOrm,
+    maxSetVol: data.maxSetVol,
+    sessionVol: sessionVolByEx[exercise] || 0,
+  }));
+  const hasPRs = prExercises.length > 0;
 
   // Grupuj serie po ćwiczeniu
   const groups = [];
@@ -187,16 +212,21 @@ export default function SummaryScreen({ navigation, route }) {
         </View>
 
         {/* PR-y */}
-        {prs.length > 0 && (
-          <View style={styles.card}>
+        {hasPRs && (
+          <View style={[styles.card, styles.prCard]}>
             <View style={styles.cardHeader}>
-              <Feather name="award" size={14} color={C.gold} />
-              <Text style={[styles.cardTitle, { color: C.gold }]}>NOWE REKORDY · {prs.length}</Text>
+              <Text style={styles.prCardEmoji}>🏆</Text>
+              <Text style={[styles.cardTitle, { color: C.gold, marginBottom: 0 }]}>NOWE REKORDY</Text>
             </View>
-            {prs.map(pr => (
-              <View key={pr.id} style={styles.prRow}>
-                <Text style={styles.prEx}>{pr.exercise}</Text>
-                <Text style={styles.prVal}>{round1(pr.weight)} kg × {pr.reps}</Text>
+            {prExercises.map(({ exercise, types, maxWeight, maxOrm, maxSetVol, sessionVol }, idx) => (
+              <View key={exercise} style={[styles.prExRow, idx > 0 && styles.prExRowBorder]}>
+                <Text style={styles.prExName} numberOfLines={1}>{exercise}</Text>
+                <View style={styles.prChips}>
+                  {types.includes('weight')        && <View style={styles.prChip}><Text style={styles.prChipIcon}>⬆</Text><Text style={styles.prChipVal}>{round1(maxWeight)} kg</Text><Text style={styles.prChipLabel}>ciężar</Text></View>}
+                  {types.includes('orm')           && <View style={styles.prChip}><Text style={styles.prChipIcon}>🏆</Text><Text style={styles.prChipVal}>{round1(maxOrm)} kg</Text><Text style={styles.prChipLabel}>1RM</Text></View>}
+                  {types.includes('setVolume')     && <View style={styles.prChip}><Text style={styles.prChipIcon}>💪</Text><Text style={styles.prChipVal}>{Math.round(maxSetVol)} kg</Text><Text style={styles.prChipLabel}>vol setu</Text></View>}
+                  {types.includes('sessionVolume') && <View style={styles.prChip}><Text style={styles.prChipIcon}>🔥</Text><Text style={styles.prChipVal}>{Math.round(sessionVol)} kg</Text><Text style={styles.prChipLabel}>vol sesji</Text></View>}
+                </View>
               </View>
             ))}
           </View>
@@ -206,7 +236,7 @@ export default function SummaryScreen({ navigation, route }) {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>ĆWICZENIA</Text>
           {groups.map(({ exercise, sets: exSets }) => {
-            const hasPR = prs.some(p => p.exercise === exercise);
+            const hasPR = !!prByExercise[exercise];
             return (
             <View key={exercise} style={styles.exGroup}>
               <View style={styles.exHeader}>
@@ -362,9 +392,16 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   cardTitle:  { color: C.muted, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 },
 
-  prRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)' },
-  prEx:   { color: C.txt, fontSize: 12 },
-  prVal:  { color: C.gold, fontSize: 12, fontWeight: '700' },
+  prCard:        { borderColor: '#FFD70033', backgroundColor: 'rgba(255,215,0,0.03)' },
+  prCardEmoji:   { fontSize: 14, marginRight: 4 },
+  prExRow:       { paddingVertical: 7 },
+  prExRowBorder: { borderTopWidth: 1, borderTopColor: 'rgba(255,215,0,0.1)' },
+  prExName:      { color: C.txt, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 },
+  prChips:       { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  prChip:        { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 1, borderColor: '#FFD70033', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 4 },
+  prChipIcon:    { fontSize: 11 },
+  prChipVal:     { color: C.gold, fontSize: 12, fontWeight: '800' },
+  prChipLabel:   { color: 'rgba(255,215,0,0.5)', fontSize: 10, fontWeight: '600' },
 
   exGroup:   { marginTop: 7 },
   exHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },

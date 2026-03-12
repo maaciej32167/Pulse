@@ -40,6 +40,20 @@ function useTimer(startTime, pausedAt) {
   return { elapsed, label };
 }
 
+const PR_ICON = {
+  weight:        '⬆',  // max ciężar
+  orm:           '🏆', // best 1RM
+  setVolume:     '💪', // vol setu
+  sessionVolume: '🔥', // vol sesji
+};
+
+const PR_LABEL = {
+  weight:        'MAX CIĘŻAR',
+  orm:           'BEST 1RM',
+  setVolume:     'VOL SETU',
+  sessionVolume: 'VOL SESJI',
+};
+
 // ─── custom keypad ────────────────────────────────────────────────────────────
 
 const KEYS = [['7','8','9'],['4','5','6'],['1','2','3'],['.','0','⌫']];
@@ -162,15 +176,45 @@ export default function WorkoutScreen({ navigation, route }) {
 
     const eff    = bwExercises.has(selectedEx) ? bodyWeight + w : w;
     const newOrm = estimate1RM(eff, r) || 0;
+    const setVolume = w * r;
 
-    // Check PR against all existing records for this exercise
-    const prevBest = records
-      .filter(rec => rec.exercise === selectedEx)
-      .reduce((best, rec) => {
+    const exRecords = records.filter(rec => rec.exercise === selectedEx);
+
+    // PR tylko od drugiej sesji — musi istnieć przynajmniej jedna seria z innego workoutId
+    const hasPriorSession = exRecords.some(rec => rec.workoutId && rec.workoutId !== workoutId);
+
+    const prTypes = [];
+    if (hasPriorSession) {
+      const pastRecords = exRecords.filter(rec => rec.workoutId !== workoutId);
+
+      // 1. Największy ciężar
+      const prevMaxWeight = pastRecords.reduce((m, rec) => Math.max(m, Number(rec.weight)), 0);
+      if (w > prevMaxWeight) prTypes.push('weight');
+
+      // 2. Best 1RM
+      const prevBestOrm = pastRecords.reduce((best, rec) => {
         const effRec = bwExercises.has(rec.exercise) ? (rec.bodyWeightKg || bodyWeight) + Number(rec.weight) : Number(rec.weight);
         return Math.max(best, estimate1RM(effRec, Number(rec.reps)) || 0);
       }, 0);
-    const isPR = newOrm > 0 && newOrm > prevBest;
+      if (newOrm > 0 && newOrm > prevBestOrm) prTypes.push('orm');
+
+      // 3. Najlepszy wolumen w secie
+      const prevBestSetVol = pastRecords.reduce((m, rec) => Math.max(m, Number(rec.weight) * Number(rec.reps)), 0);
+      if (setVolume > prevBestSetVol) prTypes.push('setVolume');
+
+      // 4. Najlepszy wolumen ćwiczenia na trening
+      const currentSessionVol = sessionSets
+        .filter(s => s.exercise === selectedEx)
+        .reduce((sum, s) => sum + s.weight * s.reps, 0) + setVolume;
+      const sessionVolByWorkout = {};
+      for (const rec of pastRecords) {
+        if (!rec.workoutId) continue;
+        sessionVolByWorkout[rec.workoutId] = (sessionVolByWorkout[rec.workoutId] || 0) + Number(rec.weight) * Number(rec.reps);
+      }
+      const prevBestSessionVol = Object.values(sessionVolByWorkout).reduce((m, v) => Math.max(m, v), 0);
+      if (currentSessionVol > prevBestSessionVol) prTypes.push('sessionVolume');
+    }
+    const isPR = prTypes.length > 0;
 
     const now = Date.now();
     const iso  = isoDate(now);
@@ -187,6 +231,7 @@ export default function WorkoutScreen({ navigation, route }) {
       gymId:        gym?.id   || null,
       gymName:      gym?.name || null,
       isPR,
+      prTypes,
     };
     const updated = [...records, newRecord];
     setRecords(updated);
@@ -196,7 +241,7 @@ export default function WorkoutScreen({ navigation, route }) {
     setReps('');
     setActiveField(null);
     if (isPR) {
-      setPrBanner({ exercise: selectedEx, orm: round1(newOrm) });
+      setPrBanner({ exercise: selectedEx, orm: round1(newOrm), prTypes });
       setTimeout(() => setPrBanner(null), 3500);
     } else {
       showToast('✅ Zapisano');
@@ -399,11 +444,11 @@ export default function WorkoutScreen({ navigation, route }) {
                       <Text style={styles.setReps}>{s.reps} reps</Text>
                     </View>
                     <View style={styles.setActions}>
-                      {s.isPR && (
-                        <View style={styles.prMedal}>
-                          <Text style={styles.prMedalText}>🏆</Text>
+                      {(s.prTypes || []).map(type => (
+                        <View key={type} style={styles.prMedal}>
+                          <Text style={styles.prMedalText}>{PR_ICON[type]}</Text>
                         </View>
-                      )}
+                      ))}
                       <TouchableOpacity onPress={() => openEdit(s)} hitSlop={8} style={styles.setActionBtn}>
                         <Feather name="edit-2" size={13} color={C.muted} />
                       </TouchableOpacity>
@@ -513,8 +558,15 @@ export default function WorkoutScreen({ navigation, route }) {
             <View style={styles.prBannerText}>
               <Text style={styles.prBannerTitle}>NOWY REKORD!</Text>
               <Text style={styles.prBannerSub} numberOfLines={1}>{prBanner.exercise}</Text>
+              <View style={styles.prBannerTags}>
+                {prBanner.prTypes.map(t => (
+                  <Text key={t} style={styles.prTag}>{PR_ICON[t]} {PR_LABEL[t]}</Text>
+                ))}
+              </View>
             </View>
-            <Text style={styles.prBannerOrm}>1RM ≈ {prBanner.orm} kg</Text>
+            {prBanner.prTypes.includes('orm') && (
+              <Text style={styles.prBannerOrm}>1RM ≈ {prBanner.orm} kg</Text>
+            )}
           </View>
         </View>
       )}
@@ -649,6 +701,8 @@ const styles = StyleSheet.create({
   prBannerText:    { flex: 1 },
   prBannerTitle:   { color: '#FFD700', fontSize: 13, fontWeight: '900', letterSpacing: 2 },
   prBannerSub:     { color: 'rgba(255,215,0,0.6)', fontSize: 12, fontWeight: '600', marginTop: 2 },
+  prBannerTags:    { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 5 },
+  prTag:           { color: '#1a1500', backgroundColor: '#FFD700', fontSize: 9, fontWeight: '800', letterSpacing: 0.5, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 },
   prBannerOrm:     { color: '#FFD700', fontSize: 15, fontWeight: '800' },
 });
 
