@@ -19,10 +19,12 @@ export function WorkoutProvider({ children }) {
     setActiveWorkout(prev => prev ? { ...prev, pausedAt: Date.now() } : prev);
   }
 
-  function resumeWorkout() {
+  function resumeWorkout(explicitPausedAt) {
     setActiveWorkout(prev => {
-      if (!prev?.pausedAt) return prev;
-      const pauseDuration = Date.now() - prev.pausedAt;
+      if (!prev) return prev;
+      const pa = explicitPausedAt ?? prev.pausedAt;
+      if (!pa) return prev;
+      const pauseDuration = Date.now() - pa;
       return { ...prev, startTime: prev.startTime + pauseDuration, pausedAt: null };
     });
   }

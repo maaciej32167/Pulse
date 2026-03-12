@@ -74,11 +74,12 @@ function CustomKeypad({ showDot, onKey }) {
 export default function WorkoutScreen({ navigation, route }) {
   const { gym, checkInTime } = route.params;
   const workoutId = useRef(generateId()).current; // stable per session
+  const pausedAtRef = useRef(null); // synchronous pause timestamp (avoids batching issues)
+  const { activeWorkout, startWorkout, updateSets, pauseWorkout, resumeWorkout, setWorkoutScreenVisible } = useWorkout();
   const { label: timerLabel } = useTimer(
     activeWorkout?.startTime ?? checkInTime,
     activeWorkout?.pausedAt ?? null,
   );
-  const { activeWorkout, startWorkout, updateSets, pauseWorkout, resumeWorkout, setWorkoutScreenVisible } = useWorkout();
 
   const [exercises, setExercises] = useState([]);
   const [records,   setRecords]   = useState([]);
@@ -97,7 +98,10 @@ export default function WorkoutScreen({ navigation, route }) {
 
   useFocusEffect(useCallback(() => {
     setWorkoutScreenVisible(true);
-    resumeWorkout();
+    if (pausedAtRef.current != null) {
+      resumeWorkout(pausedAtRef.current);
+      pausedAtRef.current = null;
+    }
     return () => setWorkoutScreenVisible(false);
   }, []));
 
@@ -246,6 +250,7 @@ export default function WorkoutScreen({ navigation, route }) {
           text: 'Zakończ',
           onPress: () => {
             const endTime = Date.now();
+            pausedAtRef.current = endTime; // synchronous — guaranteed before useFocusEffect reads it
             pauseWorkout();
             navigation.navigate('Summary', {
               gym,
