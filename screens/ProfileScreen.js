@@ -11,8 +11,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
 
 import {
-  loadRecords, loadBodyWeight, loadBWExercises, loadProfile, saveProfile,
+  loadRecords, loadBodyWeight, loadBWExercises, loadProfile, saveProfile, loadAchievements,
 } from '../src/storage';
+import { getCollectionStats } from '../src/achievements';
 import ScreenHeader from '../components/ScreenHeader';
 import { estimate1RM, round1, effectiveWeight } from '../src/utils';
 import { COLORS } from '../src/colors';
@@ -87,12 +88,15 @@ function fmtDurationShort(ms) {
 // ── RPG helpers ───────────────────────────────────────────────────────────────
 
 
-function calcXPLevel(records) {
-  const xp = records.length * 10;
+function calcXPLevel(records, achievementXP = 0) {
+  const trainingXP = Math.floor(
+    records.reduce((s, r) => s + (Number(r.weight) || 0) * (Number(r.reps) || 0), 0) / 200
+  );
+  const xp = trainingXP + achievementXP;
   const level = Math.floor(Math.sqrt(xp / 50)) + 1;
   const xpThis = 50 * (level - 1) ** 2;
   const xpNext = 50 * level ** 2;
-  return { xp, level, current: xp - xpThis, needed: xpNext - xpThis };
+  return { xp, trainingXP, achievementXP, level, current: xp - xpThis, needed: xpNext - xpThis };
 }
 
 function calcDayStreak(dayMap) {
@@ -392,9 +396,9 @@ function EditProfileModal({ visible, profile, onSave, onClose }) {
   );
 }
 
-function ProfileHero({ profile, records, onEditPress }) {
+function ProfileHero({ profile, records, achievementXP, onEditPress }) {
   const dayMap = useMemo(() => groupByDay(records), [records]);
-  const { level } = calcXPLevel(records);
+  const { level } = calcXPLevel(records, achievementXP);
   const streak    = calcDayStreak(dayMap);
   const streakLbl = streak === 1 ? 'dzień' : 'dni';
 
@@ -1935,24 +1939,26 @@ const TABS = [
 ];
 
 export default function ProfileScreen({ navigation }) {
-  const [records,     setRecords]     = useState([]);
-  const [bodyWeight,  setBodyWeight]  = useState(80);
-  const [bwExercises, setBwExercises] = useState(new Set());
-  const [profile,     setProfile]     = useState({ name: '', gym: '', location: '', avatar: '🧔' });
-  const [tab,         setTab]         = useState('stats');
-  const [editVisible, setEditVisible] = useState(false);
+  const [records,        setRecords]        = useState([]);
+  const [bodyWeight,     setBodyWeight]      = useState(80);
+  const [bwExercises,    setBwExercises]     = useState(new Set());
+  const [profile,        setProfile]         = useState({ name: '', gym: '', location: '', avatar: '🧔' });
+  const [tab,            setTab]             = useState('stats');
+  const [editVisible,    setEditVisible]     = useState(false);
+  const [achievementXP,  setAchievementXP]   = useState(0);
 
   useFocusEffect(
     useCallback(() => {
       async function load() {
-        const [rec, bw, bwEx, prof] = await Promise.all([
-          loadRecords(), loadBodyWeight(), loadBWExercises(), loadProfile(),
+        const [rec, bw, bwEx, prof, stored] = await Promise.all([
+          loadRecords(), loadBodyWeight(), loadBWExercises(), loadProfile(), loadAchievements(),
         ]);
         rec.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         setRecords(rec);
         setBodyWeight(bw);
         setBwExercises(bwEx);
         setProfile(prof);
+        setAchievementXP(getCollectionStats(stored.unlockedIds).xp);
       }
       load();
     }, [])
@@ -1972,7 +1978,7 @@ export default function ProfileScreen({ navigation }) {
       <ScreenHeader navigation={navigation} icon="user" label="PROFIL" color={COLORS.profil} />
 
       {/* Profil hero */}
-      <ProfileHero profile={profile} records={records} onEditPress={() => setEditVisible(true)} />
+      <ProfileHero profile={profile} records={records} achievementXP={achievementXP} onEditPress={() => setEditVisible(true)} />
 
       {/* Modal edycji */}
       <EditProfileModal
