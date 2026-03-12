@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import Svg, { Polygon, Line, Circle, Path, Text as SvgText } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
@@ -239,6 +239,7 @@ function IronPath({ data }) {
   );
 }
 
+
 // ── ProfileHero ───────────────────────────────────────────────────────────────
 
 function EditProfileModal({ visible, profile, onSave, onClose }) {
@@ -358,6 +359,7 @@ function EditProfileModal({ visible, profile, onSave, onClose }) {
 }
 
 function ProfileHero({ profile, records, achievementXP, onEditPress }) {
+  const navigation = useNavigation();
   const dayMap = useMemo(() => groupByDay(records), [records]);
   const { level } = calcXPLevel(records, achievementXP);
   const streak    = calcDayStreak(dayMap);
@@ -393,7 +395,7 @@ function ProfileHero({ profile, records, achievementXP, onEditPress }) {
         <TouchableOpacity onPress={onEditPress} hitSlop={12}>
           <Feather name="edit-2" size={16} color={C.muted} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => {}} hitSlop={12}>
+        <TouchableOpacity onPress={() => navigation.navigate('Settings')} hitSlop={12}>
           <Feather name="settings" size={16} color={C.muted} />
         </TouchableOpacity>
       </View>
@@ -1877,9 +1879,9 @@ export default function ProfileScreen({ navigation }) {
   const [bodyWeight,     setBodyWeight]      = useState(80);
   const [bwExercises,    setBwExercises]     = useState(new Set());
   const [profile,        setProfile]         = useState({ name: '', gym: '', location: '', avatar: '🧔' });
-  const [tab,            setTab]             = useState('stats');
-  const [editVisible,    setEditVisible]     = useState(false);
-  const [achievementXP,  setAchievementXP]   = useState(0);
+  const [tab,              setTab]             = useState('stats');
+  const [editVisible,      setEditVisible]     = useState(false);
+  const [achievementXP,    setAchievementXP]   = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -1912,7 +1914,10 @@ export default function ProfileScreen({ navigation }) {
       <ScreenHeader navigation={navigation} icon="user" label="PROFIL" color={COLORS.profil} />
 
       {/* Profil hero */}
-      <ProfileHero profile={profile} records={records} achievementXP={achievementXP} onEditPress={() => setEditVisible(true)} />
+      <ProfileHero
+        profile={profile} records={records} achievementXP={achievementXP}
+        onEditPress={() => setEditVisible(true)}
+      />
 
       {/* Modal edycji */}
       <EditProfileModal
@@ -1921,6 +1926,7 @@ export default function ProfileScreen({ navigation }) {
         onSave={handleSaveProfile}
         onClose={() => setEditVisible(false)}
       />
+
 
       {/* Tab bar */}
       <View style={styles.tabBar}>

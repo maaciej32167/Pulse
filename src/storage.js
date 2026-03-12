@@ -19,6 +19,7 @@ export const KEYS = {
   profile:       'pulse_profile',
   plans:         'pulse_plans',
   achievements:  'pulse_achievements',
+  tileSettings:  'pulse_tile_settings',
 };
 
 // Legacy keys (sila app) — only used in migration
@@ -266,4 +267,19 @@ export async function loadAchievements() {
 
 export async function saveAchievements(data) {
   await AsyncStorage.setItem(KEYS.achievements, JSON.stringify(data));
+}
+
+export const DEFAULT_TILES = [
+  { metric: 'duration', period: 'all' },
+  { metric: 'workouts', period: 'all' },
+  { metric: 'volume',   period: 'month' },
+];
+
+export async function loadTileSettings() {
+  const stored = await AsyncStorage.getItem(KEYS.tileSettings);
+  return stored ? JSON.parse(stored) : DEFAULT_TILES;
+}
+
+export async function saveTileSettings(tiles) {
+  await AsyncStorage.setItem(KEYS.tileSettings, JSON.stringify(tiles));
 }

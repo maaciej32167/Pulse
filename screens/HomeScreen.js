@@ -6,21 +6,12 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
-import { loadRecords } from '../src/storage';
+import { loadRecords, loadTileSettings, DEFAULT_TILES } from '../src/storage';
 
 function startOfDay(ts) {
   if (!ts) return 0;
   const d = new Date(ts);
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-
-function fmtDuration(ms) {
-  const h = Math.round(ms / 3600000);
-  if (h < 1)  return '< 1h';
-  if (h < 24) return `${h}h`;
-  const d = Math.floor(h / 24);
-  const rem = h % 24;
-  return rem > 0 ? `${d}d ${rem}h` : `${d}d`;
 }
 
 // ─── constants ───────────────────────────────────────────────────────────────
@@ -59,6 +50,124 @@ const C = {
   coral: '#FF4757', cyan: '#00F5FF', border: 'rgba(255,255,255,0.08)',
 };
 
+// ─── Tile metrics config ──────────────────────────────────────────────────────
+
+export const TILE_METRICS = [
+  { id: 'duration',     label: 'CZAS' },
+  { id: 'workouts',     label: 'TRENINGI' },
+  { id: 'volume',       label: 'WOLUMEN' },
+  { id: 'sets',         label: 'SERIE' },
+  { id: 'streak',       label: 'STREAK' },
+  { id: 'avg_duration', label: 'ŚR. CZAS' },
+  { id: 'followers',    label: 'FOLLOWERS' },
+];
+
+export const TILE_PERIODS = [
+  { id: 'week',  label: 'TEN TYDZIEŃ' },
+  { id: 'month', label: 'TEN MIESIĄC' },
+  { id: 'year',  label: 'TEN ROK' },
+  { id: 'all',   label: 'CAŁY CZAS' },
+];
+
+function periodRange(period) {
+  const now = Date.now();
+  const d   = new Date();
+  if (period === 'week') {
+    const daysFromMonday = (d.getDay() + 6) % 7;
+    const monday = new Date(d); monday.setDate(d.getDate() - daysFromMonday); monday.setHours(0,0,0,0);
+    return [monday.getTime(), now];
+  }
+  if (period === 'month') {
+    return [new Date(d.getFullYear(), d.getMonth(), 1).getTime(), now];
+  }
+  if (period === 'year') {
+    return [new Date(d.getFullYear(), 0, 1).getTime(), now];
+  }
+  return [0, now]; // all
+}
+
+function computeTileStat(records, { metric, period }) {
+  const [from, to] = periodRange(period);
+  const rec = records.filter(r => {
+    const ts = r.timestamp || 0;
+    return ts >= from && ts <= to;
+  });
+
+  if (metric === 'workouts') {
+    const wids = new Set(rec.map(r => r.workoutId).filter(Boolean));
+    if (wids.size > 0) return wids.size;
+    // fallback: unique days
+    return new Set(rec.map(r => startOfDay(r.timestamp || 0)).filter(Boolean)).size;
+  }
+  if (metric === 'volume') {
+    return rec.reduce((s, r) => s + (Number(r.weight) || 0) * (Number(r.reps) || 0), 0);
+  }
+  if (metric === 'sets') {
+    return rec.length;
+  }
+  if (metric === 'duration') {
+    const days = new Map();
+    for (const r of rec) {
+      const day = startOfDay(r.timestamp || 0);
+      if (!days.has(day)) days.set(day, []);
+      days.get(day).push(r.timestamp || 0);
+    }
+    let totalMs = 0;
+    for (const ts of days.values()) {
+      if (ts.length > 1) totalMs += Math.max(...ts) - Math.min(...ts);
+    }
+    return totalMs;
+  }
+  if (metric === 'avg_duration') {
+    const days = new Map();
+    for (const r of rec) {
+      const day = startOfDay(r.timestamp || 0);
+      if (!days.has(day)) days.set(day, []);
+      days.get(day).push(r.timestamp || 0);
+    }
+    let totalMs = 0, count = 0;
+    for (const ts of days.values()) {
+      if (ts.length > 1) { totalMs += Math.max(...ts) - Math.min(...ts); count++; }
+    }
+    return count > 0 ? totalMs / count : 0;
+  }
+  if (metric === 'followers') {
+    return 0; // wymaga backendu
+  }
+  if (metric === 'streak') {
+    // streak ignores period — shows current streak
+    const allDays = new Set(records.map(r => startOfDay(r.timestamp || 0)).filter(Boolean));
+    const ONE = 86400000;
+    const today = startOfDay(Date.now());
+    const start = allDays.has(today) ? today : allDays.has(today - ONE) ? today - ONE : null;
+    if (!start) return 0;
+    let s = 0;
+    for (let day = start; allDays.has(day); day -= ONE) s++;
+    return s;
+  }
+  return 0;
+}
+
+export function formatTileVal(metric, val) {
+  if (metric === 'duration' || metric === 'avg_duration') {
+    const ms = val;
+    if (!ms || ms < 60000) return '—';
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    return h > 0 ? `${h}h ${m > 0 ? m + 'm' : ''}`.trim() : `${m}m`;
+  }
+  if (metric === 'volume') {
+    if (!val) return '—';
+    return val >= 1000
+      ? `${(val / 1000).toFixed(1).replace('.0', '')}t`
+      : `${Math.round(val)}kg`;
+  }
+  if (metric === 'streak') {
+    return val > 0 ? `${val}d` : '—';
+  }
+  return val > 0 ? String(val) : '—';
+}
+
 // ─── component ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen({ navigation }) {
@@ -66,7 +175,8 @@ export default function HomeScreen({ navigation }) {
   const [phase, setPhase]   = useState(P.IDLE);
   const [active, setActive] = useState(null);
   const [showRipple, setShowRipple] = useState(false);
-  const [stats, setStats]   = useState({ duration: 0, workouts: 0, follows: 0 });
+  const [tiles, setTiles]   = useState(DEFAULT_TILES);
+  const [tileVals, setTileVals] = useState([0, 0, 0]);
 
   const timers     = useRef([]);
   const itemAnims  = useRef(MENU.map(() => new Animated.Value(0))).current;
@@ -142,18 +252,9 @@ export default function HomeScreen({ navigation }) {
       startPulse();
 
       (async () => {
-        const rec = await loadRecords();
-        const days = new Map();
-        for (const r of rec) {
-          const day = startOfDay(r.timestamp || 0);
-          if (!days.has(day)) days.set(day, []);
-          days.get(day).push(r.timestamp || 0);
-        }
-        let totalMs = 0;
-        for (const ts of days.values()) {
-          if (ts.length > 1) totalMs += Math.max(...ts) - Math.min(...ts);
-        }
-        setStats({ duration: totalMs, workouts: days.size, follows: 0 });
+        const [rec, tileSettings] = await Promise.all([loadRecords(), loadTileSettings()]);
+        setTiles(tileSettings);
+        setTileVals(tileSettings.map(tile => computeTileStat(rec, tile)));
       })();
 
       return () => { stopPulse(); clearAll(); };
@@ -380,20 +481,21 @@ export default function HomeScreen({ navigation }) {
             {isOpen ? 'Select destination' : 'Press center to expand'}
           </Text>
           <View style={styles.statsStrip}>
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{stats.duration > 0 ? fmtDuration(stats.duration) : '—'}</Text>
-              <Text style={styles.statLabel}>DURATION</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{stats.workouts || '—'}</Text>
-              <Text style={styles.statLabel}>WORKOUTS</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{stats.follows || '—'}</Text>
-              <Text style={styles.statLabel}>FOLLOWS</Text>
-            </View>
+            {tiles.map((tile, i) => {
+              const metaCfg = TILE_METRICS.find(m => m.id === tile.metric);
+              const periodCfg = TILE_PERIODS.find(p => p.id === tile.period);
+              const val = tileVals[i] ?? 0;
+              return [
+                i > 0 && <View key={`div_${i}`} style={styles.statDivider} />,
+                <View key={tile.metric + i} style={styles.stat}>
+                  <Text style={styles.statValue}>{formatTileVal(tile.metric, val)}</Text>
+                  <Text style={styles.statLabel}>{metaCfg?.label ?? tile.metric}</Text>
+                  {tile.period !== 'all' && (
+                    <Text style={styles.statPeriod}>{periodCfg?.label}</Text>
+                  )}
+                </View>,
+              ];
+            })}
           </View>
         </Animated.View>
 
@@ -482,6 +584,7 @@ const styles = StyleSheet.create({
   statUnit:    { fontSize: 16, color: C.cyan },
   statLabel:   { fontSize: 10, letterSpacing: 5, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', marginTop: 4 },
   statDivider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.08)' },
+  statPeriod:  { fontSize: 7, letterSpacing: 1.5, color: 'rgba(255,255,255,0.15)', textTransform: 'uppercase', marginTop: 2 },
 
   // Hero
   heroWrap: { alignItems: 'center', justifyContent: 'center', zIndex: 200 },
