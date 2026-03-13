@@ -853,173 +853,6 @@ function resolveTs(r) {
   return 0;
 }
 
-// ── RekordsView ───────────────────────────────────────────────────────────────
-
-function fmtRowWeight(row) {
-  if (row.bw && row.bwAt != null)
-    return `${round1(row.bwAt)} + ${round1(row.extra)} kg`;
-  return row.eff > 0 ? `${round1(row.eff)} kg` : '—';
-}
-
-function RekordsView({ records, bodyWeight, bwExercises }) {
-  const [filterEx,  setFilterEx]  = useState('');
-  const [sortKey,   setSortKey]   = useState('weight');
-  const [sortDir,   setSortDir]   = useState('desc');
-  const [exModal,   setExModal]   = useState(false);
-
-  const exercises = useMemo(() =>
-    [...new Set(records.map(r => r.exercise))].sort(),
-    [records]
-  );
-
-  function toRow(r) {
-    const bw     = bwExercises.has(r.exercise);
-    const extra  = Number(r.weight) || 0;
-    const bwAt   = bw ? bodyWeight : null;
-    const eff    = bw ? bodyWeight + extra : extra;
-    const reps   = Number(r.reps) || 0;
-    const orm    = estimate1RM(eff, reps);
-    const volume = eff * reps;
-    return {
-      ex: r.exercise, eff, extra, bwAt, bw,
-      reps, date: r.date || '—',
-      ts: resolveTs(r),
-      orm, volume,
-    };
-  }
-
-  const rows = useMemo(() => {
-    const dir = sortDir === 'asc' ? 1 : -1;
-    const sorter = (a, b) => {
-      if (sortKey === 'reps') return dir * (a.reps - b.reps);
-      if (sortKey === 'date') return dir * (a.ts - b.ts);
-      if (sortKey === 'orm')  return dir * ((a.orm || 0) - (b.orm || 0));
-      return dir * (a.eff - b.eff); // weight
-    };
-
-    if (filterEx) {
-      // Per-exercise: group by weight, keep best reps at each weight
-      const byWeight = new Map();
-      for (const r of records.filter(r => r.exercise === filterEx)) {
-        const row = toRow(r);
-        const cur = byWeight.get(row.eff);
-        if (!cur || row.reps > cur.reps) byWeight.set(row.eff, row);
-      }
-      return Array.from(byWeight.values()).sort(sorter);
-    }
-
-    // All exercises: all sets globally, sorted by active sorter
-    return records.map(toRow).sort(sorter);
-  }, [records, filterEx, sortKey, sortDir, bodyWeight, bwExercises]);
-
-  function toggleSort(key) {
-    if (sortKey === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
-    else { setSortKey(key); setSortDir('desc'); }
-  }
-
-  const arr = sortDir === 'desc' ? '↓' : '↑';
-  const SORT_BTNS = [
-    { key: 'date',   label: 'Data' },
-    { key: 'weight', label: 'Ciężar' },
-    { key: 'reps',   label: 'Powt.' },
-    { key: 'orm',    label: '1RM' },
-  ];
-
-  if (!records.length)
-    return <View style={styles.empty}><Text style={styles.emptyText}>Brak rekordów</Text></View>;
-
-  return (
-    <View style={{ flex: 1 }}>
-      {/* Exercise filter modal */}
-      <Modal visible={exModal} animationType="slide" transparent onRequestClose={() => setExModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Filtruj ćwiczenie</Text>
-              <TouchableOpacity onPress={() => setExModal(false)} hitSlop={12}>
-                <Feather name="x" size={20} color={C.sub} />
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={['', ...exercises]}
-              keyExtractor={i => i || '__all'}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[styles.exFilterRow, (filterEx === item) && styles.exFilterRowActive]}
-                  onPress={() => { setFilterEx(item); setExModal(false); }}
-                >
-                  <Text style={[styles.exFilterText, filterEx === item && { color: RED }]}>
-                    {item || 'Wszystkie ćwiczenia'}
-                  </Text>
-                  {filterEx === item && <Feather name="check" size={14} color={RED} />}
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
-
-      {/* Toolbar */}
-      <View style={styles.rekordyToolbar}>
-        <TouchableOpacity style={styles.exFilterBtn} onPress={() => setExModal(true)} activeOpacity={0.8}>
-          <Feather name="filter" size={13} color={filterEx ? RED : C.sub} />
-          <Text style={[styles.exFilterBtnText, filterEx && { color: RED }]} numberOfLines={1}>
-            {filterEx || 'Wszystkie ćwiczenia'}
-          </Text>
-          <Feather name="chevron-down" size={13} color={filterEx ? RED : C.muted} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Sort buttons */}
-      <View style={styles.sortRow}>
-        {SORT_BTNS.map(b => (
-          <TouchableOpacity
-            key={b.key}
-            style={[styles.sortBtn, sortKey === b.key && styles.sortBtnActive]}
-            onPress={() => toggleSort(b.key)}
-          >
-            <Text style={[styles.sortBtnText, sortKey === b.key && styles.sortBtnTextActive]}>
-              {b.label}{sortKey === b.key ? ` ${arr}` : ''}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Results */}
-      <FlatList
-        data={rows}
-        keyExtractor={(item, i) => `${item.ex}-${item.eff}-${item.reps}-${i}`}
-        contentContainerStyle={{ paddingBottom: 32 }}
-        ListEmptyComponent={<View style={styles.empty}><Text style={styles.emptyText}>Brak wyników</Text></View>}
-        renderItem={({ item, index }) => (
-          <View style={[styles.prRowCompact, index < rows.length - 1 && styles.prRowCompactBorder]}>
-            {/* Left: name + meta */}
-            <View style={{ flex: 1, marginRight: 10 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <Text style={styles.prExercise} numberOfLines={1}>{item.ex}</Text>
-                {item.bw && <Text style={styles.bwTag}>BW</Text>}
-              </View>
-              <Text style={styles.prDate}>{item.date}</Text>
-            </View>
-            {/* Right: weight × reps + sub */}
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.prWeightReps}>
-                <Text style={{ color: RED }}>{fmtRowWeight(item)}</Text>
-                <Text style={{ color: C.txt }}> × {item.reps} reps</Text>
-              </Text>
-              <Text style={styles.prSubLine}>
-                {item.orm ? `1RM ≈ ${round1(item.orm)} kg` : ''}
-                {item.orm && item.volume > 0 ? '  ·  ' : ''}
-                {item.volume > 0 ? `${Math.round(item.volume)} kg vol` : ''}
-              </Text>
-            </View>
-          </View>
-        )}
-      />
-    </View>
-  );
-}
-
 // ── Muscle distribution ───────────────────────────────────────────────────────
 
 const MUSCLE_COLORS = {
@@ -2023,7 +1856,6 @@ function KalendarzView({ records, navigation, bodyWeight, bwExercises }) {
 const TABS = [
   { key: 'stats',    label: 'STATS' },
   { key: 'historia', label: 'HISTORIA' },
-  { key: 'rekordy',  label: 'REKORDY' },
   { key: 'dash',     label: 'RAPORT' },
   { key: 'cwicz',    label: 'ĆWICZ.' },
 ];
@@ -2101,8 +1933,7 @@ export default function ProfileScreen({ navigation }) {
 
       {tab === 'stats'    && <StatsView    records={records} />}
       {tab === 'historia' && <HistoriaView records={records} bodyWeight={bodyWeight} bwExercises={bwExercises} />}
-      {tab === 'rekordy'  && <RekordsView  records={records} bodyWeight={bodyWeight} bwExercises={bwExercises} />}
-      {tab === 'dash'     && <MonthlyReportView records={records} />}
+{tab === 'dash'     && <MonthlyReportView records={records} />}
       {tab === 'cwicz'    && <CwiczeniaView records={records} bodyWeight={bodyWeight} bwExercises={bwExercises} />}
     </SafeAreaView>
   );
@@ -2290,19 +2121,6 @@ const styles = StyleSheet.create({
   },
   detailPRMedalText: { fontSize: 13 },
 
-  // RekordsView
-  rekordyToolbar: {
-    paddingHorizontal: 16, paddingVertical: 8,
-    borderBottomWidth: 1, borderBottomColor: C.border,
-  },
-  exFilterBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
-    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
-    alignSelf: 'flex-start', maxWidth: '100%',
-  },
-  exFilterBtnText: { color: C.sub, fontSize: 12, fontWeight: '600', flex: 1 },
-
   sortRow: {
     flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingVertical: 8,
     borderBottomWidth: 1, borderBottomColor: C.border,
@@ -2314,14 +2132,6 @@ const styles = StyleSheet.create({
   sortBtnActive:     { borderColor: RED },
   sortBtnText:       { color: C.muted, fontSize: 10, fontWeight: '700' },
   sortBtnTextActive: { color: RED },
-
-  exFilterRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 13, paddingHorizontal: 4,
-    borderBottomWidth: 1, borderBottomColor: C.border,
-  },
-  exFilterRowActive: {},
-  exFilterText: { color: C.sub, fontSize: 14 },
 
   prRowCompact: {
     flexDirection: 'row', alignItems: 'center',
