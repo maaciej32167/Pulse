@@ -7,6 +7,10 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useEffect, useState } from 'react';
 import { WorkoutProvider, useWorkout } from './src/WorkoutContext';
+import { Audio } from 'expo-av';
+
+// Jednorazowa konfiguracja sesji audio
+Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false });
 
 import HomeScreen      from './screens/HomeScreen';
 import StartScreen     from './screens/StartScreen';

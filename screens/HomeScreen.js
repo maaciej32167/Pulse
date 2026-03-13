@@ -6,7 +6,9 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadRecords, loadTileSettings, DEFAULT_TILES } from '../src/storage';
+import { initHomeHeartbeat, replayHomeHeartbeat, unloadHomeHeartbeat } from '../src/heartbeat';
 
 function startOfDay(ts) {
   if (!ts) return 0;
@@ -186,7 +188,10 @@ export default function HomeScreen({ navigation }) {
   const heroAnim    = useRef(new Animated.Value(0)).current;
   const heroMoveAnim = useRef(new Animated.Value(0)).current;
   const pulseRunning  = useRef(false);
+  const openRunning   = useRef(false);
   const heartbeatRef  = useRef(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const soundEnabledRef = useRef(true);
 
   const after = (fn, ms) => {
     const id = setTimeout(fn, ms);
@@ -205,6 +210,7 @@ export default function HomeScreen({ navigation }) {
     function runCycle() {
       if (!pulseRunning.current) return;
       heartAnim.setValue(1);
+      if (soundEnabledRef.current) replayHomeHeartbeat();
       Animated.sequence([
         Animated.timing(heartAnim, { toValue: 1.06, duration: 110, useNativeDriver: true }),
         Animated.timing(heartAnim, { toValue: 0.99, duration: 140, useNativeDriver: true }),
@@ -225,17 +231,30 @@ export default function HomeScreen({ navigation }) {
   }
 
   function startOpenHeartbeat() {
+    openRunning.current = true;
     heartAnim.setValue(1);
-    heartbeatRef.current = Animated.loop(
+
+    function runCycle() {
+      if (!openRunning.current) return;
+      heartAnim.setValue(1);
+      if (soundEnabledRef.current) replayHomeHeartbeat();
       Animated.sequence([
         Animated.timing(heartAnim, { toValue: 1.03,  duration: 110, useNativeDriver: true }),
         Animated.timing(heartAnim, { toValue: 0.995, duration: 140, useNativeDriver: true }),
         Animated.timing(heartAnim, { toValue: 1.045, duration: 110, useNativeDriver: true }),
         Animated.timing(heartAnim, { toValue: 1.00,  duration: 180, useNativeDriver: true }),
         Animated.timing(heartAnim, { toValue: 1.00,  duration: 560, useNativeDriver: true }),
-      ])
-    );
-    heartbeatRef.current.start();
+      ]).start(({ finished }) => {
+        if (finished && openRunning.current) runCycle();
+      });
+    }
+
+    runCycle();
+  }
+
+  function stopOpenHeartbeat() {
+    openRunning.current = false;
+    heartAnim.stopAnimation();
   }
 
   useFocusEffect(
@@ -249,7 +268,14 @@ export default function HomeScreen({ navigation }) {
       heartAnim.setValue(1);
       heroAnim.setValue(0);
       heroMoveAnim.setValue(0);
-      startPulse();
+      (async () => {
+        const saved = await AsyncStorage.getItem('pulse_sound_enabled');
+        const enabled = saved === null ? true : saved === 'true';
+        soundEnabledRef.current = enabled;
+        setSoundEnabled(enabled);
+        await initHomeHeartbeat();
+        startPulse();
+      })();
 
       (async () => {
         const [rec, tileSettings] = await Promise.all([loadRecords(), loadTileSettings()]);
@@ -257,7 +283,7 @@ export default function HomeScreen({ navigation }) {
         setTileVals(tileSettings.map(tile => computeTileStat(rec, tile)));
       })();
 
-      return () => { stopPulse(); clearAll(); };
+      return () => { stopPulse(); clearAll(); unloadHomeHeartbeat(); };
     }, [])
   );
 
@@ -281,6 +307,16 @@ export default function HomeScreen({ navigation }) {
 
     } else if (phase === P.OPEN) {
       setPhase(P.IDLE);
+      stopOpenHeartbeat();
+
+      if (soundEnabledRef.current) replayHomeHeartbeat();
+      heartAnim.setValue(1);
+      Animated.sequence([
+        Animated.timing(heartAnim, { toValue: 1.03,  duration: 110, useNativeDriver: true }),
+        Animated.timing(heartAnim, { toValue: 0.995, duration: 140, useNativeDriver: true }),
+        Animated.timing(heartAnim, { toValue: 1.045, duration: 110, useNativeDriver: true }),
+        Animated.timing(heartAnim, { toValue: 1.00,  duration: 180, useNativeDriver: true }),
+      ]).start();
 
       Animated.spring(rotateAnim, { toValue: 0, tension: 45, friction: 10, useNativeDriver: true }).start();
 
@@ -303,8 +339,9 @@ export default function HomeScreen({ navigation }) {
 
     Animated.spring(rotateAnim, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
 
-    heartbeatRef.current?.stop();
+    stopOpenHeartbeat();
 
+    if (soundEnabledRef.current) replayHomeHeartbeat();
     heartAnim.setValue(1);
     Animated.sequence([
       Animated.timing(heartAnim, { toValue: 1.20, duration: 120, useNativeDriver: true }),
@@ -394,6 +431,22 @@ export default function HomeScreen({ navigation }) {
             <Text style={{ color: C.coral }}>SE</Text>
           </Text>
           <Text style={styles.tagline}>Train · Track · Share</Text>
+          <TouchableOpacity
+            style={styles.soundBtn}
+            onPress={() => {
+              const next = !soundEnabledRef.current;
+              soundEnabledRef.current = next;
+              setSoundEnabled(next);
+              AsyncStorage.setItem('pulse_sound_enabled', String(next));
+            }}
+            hitSlop={12}
+          >
+            <Feather
+              name={soundEnabled ? 'volume-2' : 'volume-x'}
+              size={18}
+              color={soundEnabled ? 'rgba(255,255,255,0.4)' : C.coral}
+            />
+          </TouchableOpacity>
         </Animated.View>
 
         {/* ── Hint ── */}
@@ -539,6 +592,7 @@ const styles = StyleSheet.create({
   fade: { opacity: 0 },
 
   header:  { alignItems: 'center', paddingTop: 24, paddingBottom: 4 },
+  soundBtn: { position: 'absolute', right: 16, top: 28 },
   logo:    { fontSize: 52, fontWeight: '900', letterSpacing: 8 },
   tagline: { fontSize: 12, letterSpacing: 6, color: C.muted, textTransform: 'uppercase', marginTop: 6 },
 
