@@ -1522,12 +1522,78 @@ const PERIODS = [
   { label: 'Całość', days: null },
 ];
 
-function CwiczeniaDetail({ exercise, records, bodyWeight, bwExercises, onBack }) {
+// ── ExPickerModal ─────────────────────────────────────────────────────────────
+
+function ExPickerModal({ visible, exercises, onSelect, onClose }) {
+  const [query, setQuery] = useState('');
+
+  useEffect(() => { if (!visible) setQuery(''); }, [visible]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? exercises.filter(ex => ex.toLowerCase().includes(q)) : exercises;
+  }, [exercises, query]);
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.exPickerOverlay}>
+        <View style={styles.exPickerSheet}>
+          <View style={styles.exPickerHeader}>
+            <Feather name="search" size={14} color={C.muted} />
+            <TextInput
+              style={styles.exPickerInput}
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Szukaj ćwiczenia…"
+              placeholderTextColor={C.muted}
+              autoFocus
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity onPress={onClose} hitSlop={12}>
+              <Feather name="x" size={16} color={C.muted} />
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={filtered}
+            keyExtractor={ex => ex}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.exPickerItem}
+                onPress={() => { onSelect(item); onClose(); }}
+              >
+                <Text style={styles.exPickerItemText}>{item}</Text>
+                <Feather name="chevron-right" size={14} color={C.muted} />
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const CWICZ_SORT_BTNS = [
+  { key: 'date',   label: 'Data' },
+  { key: 'weight', label: 'Ciężar' },
+  { key: 'reps',   label: 'Powt.' },
+  { key: 'orm',    label: '1RM' },
+];
+
+function CwiczeniaDetail({ exercise, records, bodyWeight, bwExercises, onBack, onChangeExercise }) {
   const isBW = bwExercises.has(exercise);
+  const [sortKey, setSortKey] = useState('weight');
+  const [sortDir, setSortDir] = useState('desc');
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const allExercises = useMemo(() =>
+    [...new Set(records.map(r => r.exercise).filter(Boolean))].sort(),
+    [records]
+  );
 
   const exRecs = useMemo(() =>
-    records.filter(r => r.exercise === exercise && r.timestamp > 0)
-           .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)),
+    records.filter(r => r.exercise === exercise && r.timestamp > 0),
     [records, exercise]
   );
 
@@ -1557,67 +1623,162 @@ function CwiczeniaDetail({ exercise, records, bodyWeight, bwExercises, onBack })
     }, null);
   }, [exRecs, bwExercises, bodyWeight]);
 
-  function fmtWeight(r) {
+  const bestSessionVolume = useMemo(() => {
+    if (!exRecs.length) return null;
+    const sessionMap = new Map();
+    for (const r of exRecs) {
+      const key = r.workoutId || `day_${startOfDay(r.timestamp || 0)}`;
+      const vol = effectiveWeight(r, bwExercises, bodyWeight) * (Number(r.reps) || 0);
+      const cur = sessionMap.get(key) || { vol: 0, date: r.date };
+      sessionMap.set(key, { vol: cur.vol + vol, date: cur.date || r.date });
+    }
+    let best = null;
+    for (const [, s] of sessionMap) {
+      if (!best || s.vol > best.vol) best = s;
+    }
+    return best;
+  }, [exRecs, bwExercises, bodyWeight]);
+
+  const rows = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return exRecs.map(r => {
+      const extra = Number(r.weight) || 0;
+      const eff   = isBW ? bodyWeight + extra : extra;
+      const reps  = Number(r.reps) || 0;
+      const orm   = estimate1RM(eff, reps);
+      return { r, eff, extra, reps, orm, volume: eff * reps, ts: resolveTs(r), date: r.date || '—' };
+    }).sort((a, b) => {
+      if (sortKey === 'reps')   return dir * (a.reps - b.reps);
+      if (sortKey === 'orm')    return dir * ((a.orm || 0) - (b.orm || 0));
+      if (sortKey === 'weight') return dir * (a.eff - b.eff);
+      return dir * (a.ts - b.ts);
+    });
+  }, [exRecs, sortKey, sortDir, isBW, bodyWeight]);
+
+  function toggleSort(key) {
+    if (sortKey === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
+    else { setSortKey(key); setSortDir('desc'); }
+  }
+
+  function fmtW(row) {
+    if (isBW) return `${round1(row.r.bodyWeightKg || bodyWeight)} + ${round1(row.extra)} kg`;
+    return row.eff > 0 ? `${round1(row.eff)} kg` : '—';
+  }
+
+  function fmtPR(r) {
     if (!r) return '—';
     if (isBW) return `${round1(r.bodyWeightKg || bodyWeight)} + ${round1(r.weight)} kg`;
     return `${round1(r.weight)} kg`;
   }
 
+  const arr = sortDir === 'desc' ? '↓' : '↑';
+
   const prItems = [
     { label: 'Największy ciężar', icon: 'trending-up', color: RED,
-      val: heaviest ? `${fmtWeight(heaviest)} × ${heaviest.reps}` : '—', sub: heaviest?.date },
+      val: heaviest ? fmtPR(heaviest) : '—', sub: heaviest?.date },
     { label: 'Najlepszy 1RM',     icon: 'award',       color: C.gold,
       val: best1RM ? `${round1(best1RM.orm)} kg` : '—', sub: best1RM?.date },
     { label: 'Wolumen w secie',   icon: 'layers',      color: '#a78bfa',
-      val: bestVolume ? `${Math.round(bestVolume.vol)} kg` : '—', sub: bestVolume?.date },
+      val: bestVolume ? `${fmtPR(bestVolume)} × ${bestVolume.reps}` : '—', sub: bestVolume?.date },
+    { label: 'Wolumen treningu',  icon: 'bar-chart-2', color: '#00d4ff',
+      val: bestSessionVolume ? `${Math.round(bestSessionVolume.vol)} kg` : '—', sub: bestSessionVolume?.date },
   ];
 
   return (
-    <ScrollView contentContainerStyle={styles.listPad} showsVerticalScrollIndicator={false}>
-      <TouchableOpacity style={styles.detailBack} onPress={onBack} activeOpacity={0.7}>
-        <Feather name="chevron-left" size={16} color={RED} />
-        <Text style={styles.detailBackText}>Ćwiczenia</Text>
-      </TouchableOpacity>
+    <View style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={styles.listPad} showsVerticalScrollIndicator={false}>
+        <TouchableOpacity style={styles.detailBack} onPress={onBack} activeOpacity={0.7}>
+          <Feather name="chevron-left" size={16} color={RED} />
+          <Text style={styles.detailBackText}>Ćwiczenia</Text>
+        </TouchableOpacity>
 
-      <Text style={[styles.detailDate, { marginBottom: 16 }]}>{exercise}</Text>
+        <TouchableOpacity
+          style={styles.exPickerTrigger}
+          onPress={() => setPickerOpen(true)}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.detailDate, { flex: 1 }]} numberOfLines={1}>{exercise}</Text>
+          <Feather name="search" size={15} color={C.muted} />
+        </TouchableOpacity>
 
-      {/* PR kafelki */}
-      <View style={[styles.detailStats, { marginBottom: 20 }]}>
-        {prItems.map(({ label, icon, color, val, sub }) => (
-          <View key={label} style={styles.detailStatItem}>
-            <View style={styles.detailStatIconRow}>
-              <Feather name={icon} size={14} color={color} />
-              <Text style={[styles.detailStatVal, { color }]}>{val}</Text>
+        <ExPickerModal
+          visible={pickerOpen}
+          exercises={allExercises}
+          onSelect={ex => { onChangeExercise(ex); }}
+          onClose={() => setPickerOpen(false)}
+        />
+
+        {/* PR kafelki */}
+        <View style={[styles.detailStats, { marginBottom: 24 }]}>
+          {prItems.map(({ label, icon, color, val, sub }) => (
+            <View key={label} style={styles.detailStatItem}>
+              <View style={styles.detailStatIconRow}>
+                <Feather name={icon} size={14} color={color} />
+                <Text style={[styles.detailStatVal, { color }]}>{val}</Text>
+              </View>
+              <Text style={styles.detailStatLbl}>{label}</Text>
+              {!!sub && <Text style={[styles.detailStatLbl, { marginTop: 2 }]}>{sub}</Text>}
             </View>
-            <Text style={styles.detailStatLbl}>{label}</Text>
-            {!!sub && <Text style={[styles.detailStatLbl, { marginTop: 2 }]}>{sub}</Text>}
+          ))}
+        </View>
+
+        <Text style={[styles.listSectionTitle, { marginBottom: 10 }]}>Najlepsze wyniki</Text>
+
+        {/* Sortowanie */}
+        <View style={styles.sortRow}>
+          {CWICZ_SORT_BTNS.map(b => (
+            <TouchableOpacity
+              key={b.key}
+              style={[styles.sortBtn, sortKey === b.key && styles.sortBtnActive]}
+              onPress={() => toggleSort(b.key)}
+            >
+              <Text style={[styles.sortBtnText, sortKey === b.key && styles.sortBtnTextActive]}>
+                {b.label}{sortKey === b.key ? ` ${arr}` : ''}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Tabela serii */}
+        {rows.length === 0 && (
+          <View style={styles.empty}><Text style={styles.emptyText}>Brak serii</Text></View>
+        )}
+        {rows.map((item, index) => (
+          <View key={item.r.id || index} style={[styles.prRowCompact, index < rows.length - 1 && styles.prRowCompactBorder]}>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text style={styles.prDate}>{item.date}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={styles.prWeightReps}>
+                <Text style={{ color: RED }}>{fmtW(item)}</Text>
+                <Text style={{ color: C.txt }}> × {item.reps} reps</Text>
+              </Text>
+              <Text style={styles.prSubLine}>
+                {item.orm ? `1RM ≈ ${round1(item.orm)} kg` : ''}
+                {item.orm && item.volume > 0 ? '  ·  ' : ''}
+                {item.volume > 0 ? `${Math.round(item.volume)} kg vol` : ''}
+              </Text>
+            </View>
           </View>
         ))}
-      </View>
 
-      {/* Ostatnie serie */}
-      <Text style={[styles.listSectionTitle, { marginBottom: 10 }]}>Historia serii</Text>
-      {exRecs.slice(0, 30).map((r, i) => (
-        <View key={r.id || i} style={[styles.detailSetRow, i > 0 && { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }]}>
-          <Text style={styles.detailSetNum}>{i + 1}</Text>
-          <Text style={styles.detailSetWeight}>
-            <Text style={{ color: RED }}>{fmtWeight(r)}</Text>
-            <Text style={styles.detailSetX}> × </Text>
-            <Text style={styles.detailSetReps}>{r.reps} reps</Text>
-          </Text>
-          <Text style={styles.detailSetVol}>{r.date || '—'}</Text>
-        </View>
-      ))}
-    </ScrollView>
+        <View style={{ height: 32 }} />
+      </ScrollView>
+    </View>
   );
 }
 
 function CwiczeniaView({ records, bodyWeight, bwExercises }) {
   const [period, setPeriod]       = useState(null);
   const [selected, setSelected]   = useState(null);
-  const [query, setQuery]         = useState('');
   const [sortDesc, setSortDesc]   = useState(true);
   const [showPeriod, setShowPeriod] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const allExercises = useMemo(() =>
+    [...new Set(records.map(r => r.exercise).filter(Boolean))].sort(),
+    [records]
+  );
 
   const cutoff = useMemo(() => {
     if (!period) return 0;
@@ -1644,13 +1805,11 @@ function CwiczeniaView({ records, bodyWeight, bwExercises }) {
       .map(([ex, { days, last }]) => ({ ex, count: days.size, last }));
   }, [filtered]);
 
-  const displayStats = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const base = q ? exerciseStats.filter(e => e.ex.toLowerCase().includes(q)) : exerciseStats;
-    return [...base].sort((a, b) => sortDesc
+  const displayStats = useMemo(() =>
+    [...exerciseStats].sort((a, b) => sortDesc
       ? (b.count - a.count || b.last - a.last)
-      : (a.count - b.count || a.last - b.last));
-  }, [exerciseStats, query, sortDesc]);
+      : (a.count - b.count || a.last - b.last)),
+    [exerciseStats, sortDesc]);
 
   if (selected) {
     return (
@@ -1660,6 +1819,7 @@ function CwiczeniaView({ records, bodyWeight, bwExercises }) {
         bodyWeight={bodyWeight}
         bwExercises={bwExercises}
         onBack={() => setSelected(null)}
+        onChangeExercise={ex => setSelected(ex)}
       />
     );
   }
@@ -1668,23 +1828,17 @@ function CwiczeniaView({ records, bodyWeight, bwExercises }) {
     <View style={{ flex: 1 }}>
       {/* Toolbar: wyszukiwarka + okres + sortowanie */}
       <View style={styles.cwiczToolRow}>
-        <View style={styles.cwiczSearchWrap}>
+        <TouchableOpacity style={styles.cwiczSearchWrap} onPress={() => setPickerOpen(true)} activeOpacity={0.8}>
           <Feather name="search" size={13} color={C.muted} />
-          <TextInput
-            style={styles.cwiczSearchInput}
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Szukaj…"
-            placeholderTextColor={C.muted}
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-          {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}>
-              <Feather name="x" size={13} color={C.muted} />
-            </TouchableOpacity>
-          )}
-        </View>
+          <Text style={styles.cwiczSearchInput}>Szukaj ćwiczenia…</Text>
+        </TouchableOpacity>
+
+        <ExPickerModal
+          visible={pickerOpen}
+          exercises={allExercises}
+          onSelect={ex => setSelected(ex)}
+          onClose={() => setPickerOpen(false)}
+        />
 
         <View>
           <TouchableOpacity style={styles.cwiczPeriodDropBtn} onPress={() => setShowPeriod(v => !v)}>
@@ -2370,8 +2524,33 @@ const styles = StyleSheet.create({
   cwiczFreqBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   cwiczFreqNum:   { color: RED, fontSize: 16, fontWeight: '800' },
   cwiczToolRow:   { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8, alignItems: 'center' },
-  cwiczSearchWrap:{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: 10, paddingHorizontal: 10, height: 36 },
-  cwiczSearchInput:{ flex: 1, color: C.txt, fontSize: 13 },
+  cwiczSearchWrap:  { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: 10, paddingHorizontal: 10, height: 36 },
+  cwiczSearchInput: { flex: 1, color: C.muted, fontSize: 13 },
+
+  // ExPickerModal
+  exPickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  exPickerSheet: {
+    backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    borderTopWidth: 1, borderColor: C.border, maxHeight: '85%',
+  },
+  exPickerHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    padding: 14, borderBottomWidth: 1, borderBottomColor: C.border,
+  },
+  exPickerInput:    { flex: 1, color: C.txt, fontSize: 15, paddingVertical: 4 },
+  exPickerItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 14, paddingHorizontal: 16,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
+  exPickerItemText: { color: C.txt, fontSize: 14 },
+
+  // CwiczeniaDetail trigger
+  exPickerTrigger: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginBottom: 16, paddingBottom: 12,
+    borderBottomWidth: 1, borderBottomColor: C.border,
+  },
   cwiczSortBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: RED + '18', borderWidth: 1, borderColor: RED + '40', alignItems: 'center', justifyContent: 'center' },
   cwiczPeriodDropBtn:  { flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, paddingHorizontal: 10, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   cwiczPeriodDropText: { color: C.txt, fontSize: 12, fontWeight: '700' },
