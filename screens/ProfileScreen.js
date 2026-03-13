@@ -407,30 +407,58 @@ function ProfileHero({ profile, records, achievementXP, onEditPress }) {
 // ── StatsView ─────────────────────────────────────────────────────────────────
 
 function StatsView({ records }) {
-  const [timeframe, setTimeframe] = useState('week');
+  const [timeframe, setTimeframe] = useState('day');
   const [metric,    setMetric]    = useState('duration');
   const dayMap = useMemo(() => groupByDay(records), [records]);
 
   const chartData = useMemo(() => {
     const now = new Date();
-    if (timeframe === 'week') {
-      // Poniedziałek bieżącego tygodnia (Pn=0 … Nd=6)
-      const today = new Date();
-      const daysFromMonday = (today.getDay() + 6) % 7; // 0=Pn, 6=Nd
-      const monday = new Date(today);
-      monday.setDate(today.getDate() - daysFromMonday);
-      monday.setHours(0, 0, 0, 0);
 
+    if (timeframe === 'day') {
+      // Bieżący tydzień Pn–Nd, słupki dzienne
+      const daysFromMonday = (now.getDay() + 6) % 7;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - daysFromMonday);
+      monday.setHours(0, 0, 0, 0);
       return DAYS_SHORT.map((label, i) => {
         const d = new Date(monday);
         d.setDate(monday.getDate() + i);
         const ts = startOfDay(d.getTime());
         const recs = dayMap.get(ts) || [];
-        const uniqueWids = new Set(recs.map(r => r.workoutId).filter(Boolean));
-        const trainings = uniqueWids.size || (recs.length > 0 ? 1 : 0);
-        return { label, volume: getDayVolume(recs), trainings, duration: getDayDurationMs(recs) };
+        const wids = new Set(recs.map(r => r.workoutId).filter(Boolean));
+        return { label, volume: getDayVolume(recs), trainings: wids.size || (recs.length > 0 ? 1 : 0), duration: getDayDurationMs(recs) };
       });
     }
+
+    if (timeframe === 'week') {
+      // Bieżący miesiąc, słupki tygodniowe (Pn–Nd)
+      const year = now.getFullYear(), month = now.getMonth();
+      const firstDay = new Date(year, month, 1);
+      const daysFromMonday = (firstDay.getDay() + 6) % 7;
+      const weekStart = new Date(year, month, 1 - daysFromMonday);
+      const weeks = [];
+      for (let w = new Date(weekStart); w.getMonth() <= month && w.getFullYear() <= year; w.setDate(w.getDate() + 7)) {
+        let vol = 0, tr = 0, dur = 0;
+        let pn = null, pt = null;
+        for (let offset = 0; offset < 7; offset++) {
+          const d = new Date(w);
+          d.setDate(w.getDate() + offset);
+          if (d.getMonth() !== month) continue;
+          if (!pn) pn = d.getDate();
+          pt = d.getDate();
+          const ts = startOfDay(d.getTime());
+          const recs = dayMap.get(ts) || [];
+          vol += getDayVolume(recs);
+          const wids = new Set(recs.map(r => r.workoutId).filter(Boolean));
+          tr += wids.size || (recs.length > 0 ? 1 : 0);
+          dur += getDayDurationMs(recs);
+        }
+        if (pn !== null) weeks.push({ label: `${pn}–${pt}`, volume: vol, trainings: tr, duration: dur });
+      }
+      return weeks;
+    }
+
+    // Miesięczny — ostatnie 6 miesięcy
     return Array.from({ length: 6 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
       const mS = d.getTime();
@@ -451,7 +479,7 @@ function StatsView({ records }) {
   // Rekordy z wybranego okresu (dla MuscleFocus)
   const periodRecords = useMemo(() => {
     const now = new Date();
-    if (timeframe === 'week') {
+    if (timeframe === 'day') {
       const daysFromMonday = (now.getDay() + 6) % 7;
       const monday = new Date(now);
       monday.setDate(now.getDate() - daysFromMonday);
@@ -459,9 +487,13 @@ function StatsView({ records }) {
       const sunday = monday.getTime() + 6 * 86400000 + 86399999;
       return records.filter(r => resolveTs(r) >= monday.getTime() && resolveTs(r) <= sunday);
     }
-    const mStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-    const mEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
-    return records.filter(r => resolveTs(r) >= mStart && resolveTs(r) <= mEnd);
+    if (timeframe === 'week') {
+      const mStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+      const mEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
+      return records.filter(r => resolveTs(r) >= mStart && resolveTs(r) <= mEnd);
+    }
+    const from = new Date(now.getFullYear(), now.getMonth() - 5, 1).getTime();
+    return records.filter(r => resolveTs(r) >= from);
   }, [timeframe, records]);
 
   // Podsumowanie zsumowane z chartData (reaguje na filtr tydzień/miesiące)
@@ -488,7 +520,7 @@ function StatsView({ records }) {
     <ScrollView contentContainerStyle={styles.padded} showsVerticalScrollIndicator={false}>
       {/* Timeframe */}
       <View style={styles.tfRow}>
-        {[['week', 'TYDZIEŃ'], ['month', 'MIESIĄCE']].map(([id, lbl]) => (
+        {[['day', 'DZIENNY'], ['week', 'TYGODNIOWY'], ['month', 'MIESIĘCZNY']].map(([id, lbl]) => (
           <TouchableOpacity
             key={id} style={[styles.tfBtn, timeframe === id && styles.tfBtnActive]}
             onPress={() => setTimeframe(id)}
@@ -498,24 +530,10 @@ function StatsView({ records }) {
         ))}
       </View>
 
-      {/* Metric selector */}
-      <View style={styles.metricRow}>
-        {METRICS.map(m => (
-          <TouchableOpacity
-            key={m.id} style={[styles.metricBtn, metric === m.id && styles.metricBtnActive]}
-            onPress={() => setMetric(m.id)}
-          >
-            <Text style={[styles.metricBtnText, metric === m.id && styles.metricBtnTextActive]}>
-              {m.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
       {/* Chart */}
       <View style={styles.chartCard}>
         <Text style={styles.chartCardTitle}>
-          {METRICS.find(m => m.id === metric)?.label} · {timeframe === 'week' ? 'ten tydzień' : 'ostatnie 6 mies.'}
+          {METRICS.find(m => m.id === metric)?.label} · {timeframe === 'day' ? 'ten tydzień' : timeframe === 'week' ? 'ten miesiąc' : 'ostatnie 6 mies.'}
         </Text>
         <View style={styles.chartBarsRow}>
           {chartData.map((d, i) => {
@@ -535,22 +553,30 @@ function StatsView({ records }) {
         </View>
       </View>
 
-      {/* Stat cards 2×2 */}
+      {/* Stat cards 2×2 — klikalne filtry wykresu */}
       <View style={styles.statGrid2}>
         {[
-          { val: avgDur > 0 ? fmtDuration(avgDur) : '—',                              lbl: 'Śr. czas sesji',  icon: 'clock',        color: '#00F5FF' },
-          { val: `${periodWorkouts}`,                                                   lbl: 'Treningi',        icon: 'activity',     color: RED       },
-          { val: `${Math.round(periodVolume).toLocaleString('pl-PL')} kg`,             lbl: 'Wolumen',         icon: 'trending-up',  color: C.gold    },
-          { val: bestStr > 0 ? `${bestStr} dni` : '—',                                 lbl: 'Najdłuższy streak', icon: 'zap',        color: '#a78bfa' },
-        ].map(({ val, lbl, icon, color }) => (
-          <View key={lbl} style={styles.statCard2}>
-            <View style={[styles.statCard2IconRow, { justifyContent: 'flex-start', gap: 7 }]}>
-              <Feather name={icon} size={14} color={color} />
-              <Text style={[styles.statCard2Val, { color }]}>{val}</Text>
-            </View>
-            <Text style={styles.statCard2Lbl}>{lbl}</Text>
-          </View>
-        ))}
+          { val: avgDur > 0 ? fmtDuration(avgDur) : '—',                              lbl: 'Śr. czas sesji',    icon: 'clock',        color: '#00F5FF', metricId: 'duration'  },
+          { val: `${periodWorkouts}`,                                                   lbl: 'Treningi',          icon: 'activity',     color: RED,        metricId: 'trainings' },
+          { val: `${Math.round(periodVolume).toLocaleString('pl-PL')} kg`,             lbl: 'Wolumen',           icon: 'trending-up',  color: C.gold,     metricId: 'volume'    },
+          { val: bestStr > 0 ? `${bestStr} dni` : '—',                                 lbl: 'Najdłuższy streak', icon: 'zap',          color: '#a78bfa',  metricId: null        },
+        ].map(({ val, lbl, icon, color, metricId }) => {
+          const active = metricId && metric === metricId;
+          return (
+            <TouchableOpacity
+              key={lbl}
+              style={[styles.statCard2, active && { borderColor: color, borderWidth: 1.5 }]}
+              onPress={() => metricId && setMetric(metricId)}
+              activeOpacity={metricId ? 0.75 : 1}
+            >
+              <View style={[styles.statCard2IconRow, { justifyContent: 'flex-start', gap: 7 }]}>
+                <Feather name={icon} size={14} color={color} />
+                <Text style={[styles.statCard2Val, { color }]}>{val}</Text>
+              </View>
+              <Text style={styles.statCard2Lbl}>{lbl}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <MuscleFocus records={periodRecords} />
