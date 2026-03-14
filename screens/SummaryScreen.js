@@ -27,6 +27,7 @@ const C = {
   cyan:   '#00F5FF',
   gold:   '#FFD700',
   green:  '#22c55e',
+  indigo: '#818cf8',
 };
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -205,10 +206,10 @@ export default function SummaryScreen({ navigation, route }) {
 
         {/* Stats */}
         <View style={styles.statsGrid}>
-          <StatBox icon="clock"      value={formatDuration(duration)} label="Czas"        color={C.cyan}  />
-          <StatBox icon="layers"     value={sets.length}              label="Serie"        color={C.coral} />
-          <StatBox icon="bar-chart-2" value={exercises.length}        label="Ćwiczenia"   color={C.cyan}  />
-          <StatBox icon="trending-up" value={`${Math.round(totalVolume)} kg`} label="Wolumen" color={C.gold} />
+          <StatBox icon="clock"       value={formatDuration(duration)}             label="Czas"      color={C.cyan}   />
+          <StatBox icon="bar-chart-2" value={exercises.length}                     label="Ćwiczenia" color={C.indigo} />
+          <StatBox icon="layers"      value={sets.length}                          label="Serie"     color={C.coral}  />
+          <StatBox icon="trending-up" value={`${Math.round(totalVolume)} kg`}     label="Wolumen"   color={C.gold}   />
         </View>
 
         {/* PR-y */}
@@ -383,7 +384,7 @@ const styles = StyleSheet.create({
   },
   statRow:   { flexDirection: 'row', alignItems: 'center', gap: 5 },
   statValue: { fontSize: 14, fontWeight: '800' },
-  statLabel: { color: C.muted, fontSize: 9, letterSpacing: 0.2 },
+  statLabel: { color: C.muted, fontSize: 10, letterSpacing: 0.2 },
 
   card: {
     backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
@@ -405,19 +406,19 @@ const styles = StyleSheet.create({
 
   exGroup:   { marginTop: 7 },
   exHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
-  exName:    { color: C.txt, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  exName:    { color: C.txt, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
   prBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: '#FFD70020', borderWidth: 1, borderColor: '#FFD70066',
     borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2,
   },
-  prBadgeText: { color: '#FFD700', fontSize: 9, fontWeight: '800' },
-  setRow:        { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)' },
-  setNum:        { color: C.muted, fontSize: 11, width: 16, textAlign: 'center' },
+  prBadgeText: { color: '#FFD700', fontSize: 10, fontWeight: '800' },
+  setRow:        { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)' },
+  setNum:        { color: C.muted, fontSize: 12, width: 16, textAlign: 'center' },
   setWeightReps: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
-  setWeight:     { color: C.coral, fontSize: 12, fontWeight: '700' },
-  setX:          { color: C.muted, fontSize: 11 },
-  setReps:       { color: C.txt, fontSize: 12 },
+  setWeight:     { color: C.coral, fontSize: 13, fontWeight: '700' },
+  setX:          { color: C.muted, fontSize: 12 },
+  setReps:       { color: C.txt, fontSize: 13 },
 
   titleInput: {
     backgroundColor: C.card, borderWidth: 1, borderColor: C.border,

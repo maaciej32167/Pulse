@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   statBox:       { flex: 1, alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4 },
   statBoxBorder: { borderRightWidth: 1, borderRightColor: C.border },
   statValue:     { fontSize: 15, fontWeight: '800', marginBottom: 3 },
-  statLabel:     { color: C.muted, fontSize: 9, letterSpacing: 0.5, textTransform: 'uppercase' },
+  statLabel:     { color: C.muted, fontSize: 10, letterSpacing: 0.5, textTransform: 'uppercase' },
 
   card: {
     backgroundColor: C.card, borderWidth: 1, borderColor: C.border,

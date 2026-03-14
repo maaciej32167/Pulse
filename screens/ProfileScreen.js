@@ -642,15 +642,63 @@ function groupExSets(dayRecs, prSet = new Set()) {
   });
 }
 
-function WorkoutCard({ day, dayRecs, allRecords, bodyWeight, bwExercises, onSelect }) {
+function buildPRDetails(dayRecs) {
+  const byEx = {}, sessionVols = {};
+  for (const r of dayRecs) {
+    sessionVols[r.exercise] = (sessionVols[r.exercise] || 0) + Number(r.weight) * Number(r.reps);
+    if (!r.isPR || !r.prTypes?.length) continue;
+    if (!byEx[r.exercise]) byEx[r.exercise] = { types: new Set(), maxWeight: 0, maxOrm: 0, maxSetVol: 0 };
+    const e = byEx[r.exercise];
+    r.prTypes.forEach(t => e.types.add(t));
+    e.maxWeight = Math.max(e.maxWeight, Number(r.weight));
+    const orm = estimate1RM(Number(r.weight), Number(r.reps)) || 0;
+    e.maxOrm = Math.max(e.maxOrm, orm);
+    e.maxSetVol = Math.max(e.maxSetVol, Number(r.weight) * Number(r.reps));
+  }
+  return Object.entries(byEx).map(([exercise, d]) => ({
+    exercise, types: [...d.types], maxWeight: d.maxWeight, maxOrm: d.maxOrm,
+    maxSetVol: d.maxSetVol, sessionVol: sessionVols[exercise] || 0,
+  }));
+}
+
+function PRChips({ types, maxWeight, maxOrm, maxSetVol, sessionVol }) {
+  return (
+    <View style={styles.prChips}>
+      {types.includes('weight')        && <View style={styles.prChip}><Text style={styles.prChipIcon}>⬆</Text><Text style={styles.prChipVal}>{round1(maxWeight)} kg</Text><Text style={styles.prChipLbl}>ciężar</Text></View>}
+      {types.includes('orm')           && <View style={styles.prChip}><Text style={styles.prChipIcon}>🏆</Text><Text style={styles.prChipVal}>{round1(maxOrm)} kg</Text><Text style={styles.prChipLbl}>1RM</Text></View>}
+      {types.includes('setVolume')     && <View style={styles.prChip}><Text style={styles.prChipIcon}>💪</Text><Text style={styles.prChipVal}>{Math.round(maxSetVol)} kg</Text><Text style={styles.prChipLbl}>vol setu</Text></View>}
+      {types.includes('sessionVolume') && <View style={styles.prChip}><Text style={styles.prChipIcon}>🔥</Text><Text style={styles.prChipVal}>{Math.round(sessionVol)} kg</Text><Text style={styles.prChipLbl}>vol sesji</Text></View>}
+    </View>
+  );
+}
+
+function WorkoutCard({ day, dayRecs, allRecords, bodyWeight, bwExercises }) {
   const [open, setOpen] = useState(false);
   const date      = dayRecs[0]?.date || new Date(day).toLocaleDateString('pl-PL');
   const exercises = [...new Set(dayRecs.map(r => r.exercise))].length;
   const volume    = getDayVolume(dayRecs);
   const duration  = getDayDurationMs(dayRecs);
   const prExs     = getPRExercises(dayRecs, allRecords, day);
-  const prSet     = new Set(prExs);
-  const exRows    = groupExSets(dayRecs, prSet);
+  const prDetails = buildPRDetails(dayRecs);
+
+  // Groups + prSetIds for per-set detail
+  const groups = [];
+  const exMap  = new Map();
+  for (const r of dayRecs) {
+    if (!exMap.has(r.exercise)) { exMap.set(r.exercise, []); groups.push({ exercise: r.exercise, sets: exMap.get(r.exercise) }); }
+    exMap.get(r.exercise).push(r);
+  }
+  const prExSet = new Set(getPRExercises(dayRecs, allRecords, day));
+  const prSetIds = new Set();
+  for (const exercise of prExSet) {
+    const exSets  = dayRecs.filter(r => r.exercise === exercise);
+    const bestSet = exSets.reduce((best, s) => {
+      const orm     = estimate1RM(Number(s.weight), Number(s.reps)) || 0;
+      const bestOrm = estimate1RM(Number(best.weight), Number(best.reps)) || 0;
+      return orm > bestOrm ? s : best;
+    });
+    if (bestSet?.id != null) prSetIds.add(String(bestSet.id));
+  }
 
   function toggle() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -683,26 +731,63 @@ function WorkoutCard({ day, dayRecs, allRecords, bodyWeight, bwExercises, onSele
       {open && (
         <View style={styles.wCardBody}>
           <View style={styles.wCardDivider} />
-          <View style={styles.exTableHeader}>
-            {['Ćwiczenie', 'Sets', 'Volume'].map((h, i) => (
-              <Text key={h} style={[styles.exTableHead, i > 0 && { textAlign: 'right' }]}>{h}</Text>
+
+          {/* Stats */}
+          <View style={styles.wCardStats}>
+            {[
+              { v: duration > 0 ? fmtDuration(duration) : '—', l: 'Czas',      icon: 'clock',        color: '#00F5FF' },
+              { v: exercises,                                    l: 'Ćwiczenia', icon: 'bar-chart-2',  color: '#818cf8' },
+              { v: dayRecs.length,                               l: 'Serie',     icon: 'layers',       color: RED       },
+              { v: `${Math.round(volume)} kg`,                   l: 'Wolumen',   icon: 'trending-up',  color: C.gold    },
+            ].map(({ v, l, icon, color }) => (
+              <View key={l} style={styles.wCardStatItem}>
+                <Feather name={icon} size={11} color={color} />
+                <Text style={[styles.wCardStatVal, { color }]}>{v}</Text>
+                <Text style={styles.wCardStatLbl}>{l}</Text>
+              </View>
             ))}
           </View>
-          {exRows.map((row, i) => (
-            <View key={row.ex} style={[styles.exRow, i < exRows.length - 1 && styles.exRowBorder]}>
-              <Text style={styles.exName} numberOfLines={1}>{row.ex}</Text>
-              <Text style={styles.exSets}>{row.sets}</Text>
-              <Text style={styles.exWeight}>{row.volume}</Text>
+
+          {/* PR section */}
+          {prDetails.length > 0 && (
+            <View style={styles.wCardPRSection}>
+              <Text style={styles.wCardPRTitle}>🏆 REKORDY</Text>
+              {prDetails.map(pr => (
+                <View key={pr.exercise} style={styles.wCardPRRow}>
+                  <Text style={styles.wCardPREx} numberOfLines={1}>{pr.exercise}</Text>
+                  <PRChips {...pr} />
+                </View>
+              ))}
             </View>
-          ))}
-          <View style={styles.wCardActions}>
-            <TouchableOpacity
-              style={styles.wCardActionBtn}
-              onPress={() => onSelect({ day, dayRecs, allRecords, bodyWeight, bwExercises, date })}
-            >
-              <Text style={styles.wCardActionText}>SZCZEGÓŁY</Text>
-            </TouchableOpacity>
-          </View>
+          )}
+
+          {/* Per-set exercise cards */}
+          {groups.map(({ exercise, sets }) => {
+            const isBW = bwExercises && bwExercises.has(exercise);
+            return (
+              <View key={exercise} style={styles.wCardExCard}>
+                <View style={styles.wCardExHeader}>
+                  <Text style={styles.wCardExName}>{exercise}</Text>
+                </View>
+                {sets.map((s, i) => {
+                  const weightStr = isBW
+                    ? `${round1(s.bodyWeightKg || bodyWeight)} + ${round1(s.weight)} kg`
+                    : `${round1(s.weight)} kg`;
+                  const isSetPR = s.id != null && prSetIds.has(String(s.id));
+                  return (
+                    <View key={s.id || i} style={[styles.wCardSetRow, isSetPR && styles.wCardSetRowPR]}>
+                      <Text style={styles.wCardSetNum}>{i + 1}</Text>
+                      <Text style={styles.wCardSetWeight}>{weightStr}</Text>
+                      <Text style={styles.wCardSetX}> × </Text>
+                      <Text style={styles.wCardSetReps}>{s.reps} reps</Text>
+                      <Text style={styles.wCardSetVol}>{Math.round((Number(s.weight) || 0) * (Number(s.reps) || 0))} kg</Text>
+                      {isSetPR && <Text style={styles.wCardSetPRIcon}>🏆</Text>}
+                    </View>
+                  );
+                })}
+              </View>
+            );
+          })}
         </View>
       )}
     </View>
@@ -726,6 +811,7 @@ function HistoriaDetail({ day, dayRecs, allRecords, bodyWeight, bwExercises, dat
 
   // PR — obliczane dynamicznie, spójne z getPRExercises
   const prExercises = new Set(getPRExercises(dayRecs, allRecords, dayStart));
+  const prDetails   = buildPRDetails(dayRecs);
   const prSetIds    = new Set();
   for (const exercise of prExercises) {
     const exSets  = dayRecs.filter(r => r.exercise === exercise);
@@ -764,6 +850,22 @@ function HistoriaDetail({ day, dayRecs, allRecords, bodyWeight, bwExercises, dat
           </View>
         ))}
       </View>
+
+      {/* PR section */}
+      {prDetails.length > 0 && (
+        <View style={[styles.detailCard, styles.detailPRCard]}>
+          <View style={styles.detailPRCardHeader}>
+            <Text style={styles.detailPRCardEmoji}>🏆</Text>
+            <Text style={styles.detailPRCardTitle}>NOWE REKORDY</Text>
+          </View>
+          {prDetails.map((pr, idx) => (
+            <View key={pr.exercise} style={[styles.detailPRExRow, idx > 0 && styles.detailPRExRowBorder]}>
+              <Text style={styles.detailPRExName} numberOfLines={1}>{pr.exercise}</Text>
+              <PRChips {...pr} />
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* Exercise cards */}
       {groups.map(({ exercise, sets }) => {
@@ -804,7 +906,6 @@ function HistoriaDetail({ day, dayRecs, allRecords, bodyWeight, bwExercises, dat
 
 function HistoriaView({ records, bodyWeight, bwExercises }) {
   const workoutMap = useMemo(() => groupByWorkout(records), [records]);
-  const [selected, setSelected] = useState(null);
 
   const workouts = useMemo(() => {
     return Array.from(workoutMap.entries())
@@ -828,10 +929,6 @@ function HistoriaView({ records, bodyWeight, bwExercises }) {
     }
     return items;
   }, [workouts]);
-
-  if (selected) {
-    return <HistoriaDetail {...selected} onBack={() => setSelected(null)} />;
-  }
 
   if (!workouts.length) {
     return (
@@ -860,7 +957,6 @@ function HistoriaView({ records, bodyWeight, bwExercises }) {
             allRecords={records}
             bodyWeight={bodyWeight}
             bwExercises={bwExercises}
-            onSelect={setSelected}
           />
         );
       }}
@@ -1148,7 +1244,7 @@ function MonthlyReportView({ records }) {
         const recs = dayMap.get(ts) || [];
         if      (metric === 'volume')   val += getDayVolume(recs);
         else if (metric === 'duration') val += getDayDurationMs(recs);
-        else if (metric === 'workouts') val += recs.length > 0 ? 1 : 0;
+        else if (metric === 'workouts') val += recs.length > 0 ? (new Set(recs.map(r => r.workoutId).filter(Boolean)).size || 1) : 0;
         else if (metric === 'sets')     val += recs.length > 0 ? countPRSets(recs, records, ts) : 0;
         else                            val += recs.length;
       }
@@ -1185,7 +1281,7 @@ function MonthlyReportView({ records }) {
       if (day < mS || day > mE) continue;
       if      (metric === 'volume')   value += getDayVolume(recs);
       else if (metric === 'duration') value += getDayDurationMs(recs);
-      else if (metric === 'workouts') value += 1;
+      else if (metric === 'workouts') value += new Set(recs.map(r => r.workoutId).filter(Boolean)).size || 1;
       else if (metric === 'sets')     value += countPRSets(recs, records, day);
       else                            value += recs.length;
     }
@@ -1315,27 +1411,6 @@ function MonthlyReportView({ records }) {
         </View>
       </Modal>
 
-      {/* 4 stat cards — tap to switch chart */}
-      <View style={styles.statGrid2}>
-        {STAT_CARDS.map(s => {
-          const active = metric === s.id;
-          return (
-            <TouchableOpacity
-              key={s.id}
-              style={[styles.statCard2, active && { borderColor: s.color + '66', backgroundColor: s.color + '0D' }]}
-              onPress={() => setMetric(s.id)}
-              activeOpacity={0.75}
-            >
-                <View style={[styles.statCard2IconRow, { justifyContent: 'flex-start', gap: 7 }]}>
-                <Feather name={s.icon} size={14} color={active ? s.color : C.muted} />
-                <Text style={[styles.statCard2Val, { color: active ? s.color : C.txt }]}>{s.value}</Text>
-              </View>
-              <Text style={[styles.statCard2Lbl, { color: active ? s.color : C.muted }]}>{s.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
       {/* Bar chart — weekly */}
       <View style={styles.chartCard}>
         <Text style={styles.chartCardTitle}>
@@ -1357,6 +1432,27 @@ function MonthlyReportView({ records }) {
             );
           })}
         </View>
+      </View>
+
+      {/* 4 stat cards — tap to switch chart */}
+      <View style={styles.statGrid2}>
+        {STAT_CARDS.map(s => {
+          const active = metric === s.id;
+          return (
+            <TouchableOpacity
+              key={s.id}
+              style={[styles.statCard2, active && { borderColor: s.color, borderWidth: 1.5 }]}
+              onPress={() => setMetric(s.id)}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.statCard2IconRow, { justifyContent: 'flex-start', gap: 7 }]}>
+                <Feather name={s.icon} size={14} color={s.color} />
+                <Text style={[styles.statCard2Val, { color: s.color }]}>{s.value}</Text>
+              </View>
+              <Text style={styles.statCard2Lbl}>{s.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* Calendar — only in month mode */}
@@ -1741,9 +1837,6 @@ function CwiczeniaView({ records, bodyWeight, bwExercises }) {
               onPress={() => setSelected(item.ex)}
               activeOpacity={0.75}
             >
-              <View style={styles.cwiczRank}>
-                <Text style={styles.cwiczRankText}>{index + 1}</Text>
-              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cwiczName} numberOfLines={1}>{item.ex}</Text>
                 <Text style={styles.cwiczSub}>
@@ -1999,11 +2092,11 @@ const styles = StyleSheet.create({
     padding: 14, gap: 10,
   },
   ironBars:     { flex: 1 },
-  ironTitle:    { color: C.muted, fontSize: 8, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 10 },
+  ironTitle:    { color: C.muted, fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 10 },
   ironItem:     { marginBottom: 7 },
   ironLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
-  ironLabel:    { color: C.sub, fontSize: 8, fontWeight: '700' },
-  ironVal:      { color: C.sub, fontSize: 8, fontWeight: '700' },
+  ironLabel:    { color: C.sub, fontSize: 10, fontWeight: '700' },
+  ironVal:      { color: C.sub, fontSize: 10, fontWeight: '700' },
   ironTrack:    { height: 2, backgroundColor: C.border, borderRadius: 2 },
   ironFill:     { height: '100%', borderRadius: 2 },
 
@@ -2024,11 +2117,11 @@ const styles = StyleSheet.create({
   empty:   { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: C.muted, fontSize: 16 },
   listSectionTitle: {
-    color: C.muted, fontSize: 8.5, fontWeight: '700',
+    color: C.muted, fontSize: 10, fontWeight: '700',
     letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 12,
   },
   historyDateHeader: {
-    color: C.sub, fontSize: 11, fontWeight: '700',
+    color: C.sub, fontSize: 13, fontWeight: '700',
     marginTop: 16, marginBottom: 8, textTransform: 'capitalize',
   },
 
@@ -2055,10 +2148,10 @@ const styles = StyleSheet.create({
   chartCardTitle: { color: C.sub, fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
   chartBarsRow:   { flexDirection: 'row', alignItems: 'flex-end', height: 100, gap: 4 },
   chartBarCol:    { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
-  chartTopLabel:    { fontSize: 7, fontWeight: '700', textAlign: 'center' },
-  chartBarTopLabel: { fontSize: 7, fontWeight: '700', color: C.sub, textAlign: 'center' },
+  chartTopLabel:    { fontSize: 9, fontWeight: '700', textAlign: 'center' },
+  chartBarTopLabel: { fontSize: 9, fontWeight: '700', color: C.sub, textAlign: 'center' },
   chartBar:         { width: '85%', borderRadius: 3 },
-  chartBarLabel:  { color: C.muted, fontSize: 8, textAlign: 'center' },
+  chartBarLabel:  { color: C.muted, fontSize: 9, textAlign: 'center' },
 
   statGrid2: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   statCard2: {
@@ -2083,23 +2176,49 @@ const styles = StyleSheet.create({
     backgroundColor: `${RED}20`, borderRadius: 3,
     paddingHorizontal: 5, paddingVertical: 2,
   },
-  prBadgeText:  { color: RED, fontSize: 7.5, fontWeight: '700', letterSpacing: 0.5 },
-  wCardDate:    { color: C.txt, fontSize: 13, fontWeight: '700' },
-  wCardMeta:    { color: C.muted, fontSize: 10 },
-  wCardVol:     { fontSize: 12, fontWeight: '700' },
-  wCardVolSub:  { color: C.muted, fontSize: 10 },
+  prBadgeText:  { color: RED, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  wCardDate:    { color: C.txt, fontSize: 15, fontWeight: '700' },
+  wCardMeta:    { color: C.muted, fontSize: 12 },
+  wCardVol:     { fontSize: 14, fontWeight: '700' },
+  wCardVolSub:  { color: C.muted, fontSize: 12 },
   wCardChev:    { color: C.muted, fontSize: 14, marginLeft: 4 },
   wCardChevOpen: { transform: [{ rotate: '180deg' }] },
   wCardBody:    { paddingHorizontal: 14, paddingBottom: 10 },
   wCardDivider: { height: 1, backgroundColor: C.border, marginBottom: 8 },
 
   exTableHeader: { flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: C.border },
-  exTableHead:   { flex: 1, color: C.muted, fontSize: 7.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  exTableHead:   { flex: 1, color: C.muted, fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   exRow:         { flexDirection: 'row', paddingVertical: 6 },
   exRowBorder:   { borderBottomWidth: 1, borderBottomColor: '#13151e' },
   exName:        { flex: 1, color: C.sub, fontSize: 11 },
   exSets:        { color: C.muted, fontSize: 11, textAlign: 'right', marginRight: 14 },
   exWeight:      { color: C.sub, fontSize: 11, textAlign: 'right', minWidth: 60 },
+  wCardStats:    { flexDirection: 'row', gap: 6, marginBottom: 12 },
+  wCardStatItem: { flex: 1, alignItems: 'center', gap: 3 },
+  wCardStatVal:  { fontSize: 14, fontWeight: '800' },
+  wCardStatLbl:  { color: C.muted, fontSize: 10, letterSpacing: 0.3 },
+
+  wCardExCard:   { backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 8, marginBottom: 6, padding: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  wCardExHeader: { marginBottom: 5 },
+  wCardExName:   { color: C.sub, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
+  wCardSetRow:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 4, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)' },
+  wCardSetRowPR: { backgroundColor: 'rgba(255,215,0,0.05)' },
+  wCardSetNum:   { color: C.muted, fontSize: 12, width: 18, textAlign: 'center' },
+  wCardSetWeight:{ color: RED, fontSize: 13, fontWeight: '700', flex: 1 },
+  wCardSetX:     { color: C.muted, fontSize: 12 },
+  wCardSetReps:  { color: C.sub, fontSize: 13 },
+  wCardSetVol:   { color: C.muted, fontSize: 11, minWidth: 50, textAlign: 'right' },
+  wCardSetPRIcon:{ fontSize: 13, marginLeft: 4 },
+
+  wCardPRSection: { marginTop: 4, marginBottom: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: C.border },
+  wCardPRTitle:   { color: C.gold, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 },
+  wCardPRRow:     { marginBottom: 6 },
+  wCardPREx:      { color: C.txt, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  prChips:        { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  prChip:         { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 1, borderColor: '#FFD70033', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 3 },
+  prChipIcon:     { fontSize: 11 },
+  prChipVal:      { color: C.gold, fontSize: 12, fontWeight: '800' },
+  prChipLbl:      { color: 'rgba(255,215,0,0.5)', fontSize: 10, fontWeight: '600' },
   wCardActions:  { flexDirection: 'row', gap: 8, marginTop: 10 },
   wCardActionBtn: {
     flex: 1, padding: 8, backgroundColor: C.border, borderRadius: 8, alignItems: 'center',
@@ -2140,6 +2259,13 @@ const styles = StyleSheet.create({
   detailSetReps:   { color: C.txt, fontSize: 12, fontWeight: '600' },
   detailSetVol:    { color: C.muted, fontSize: 10, minWidth: 50, textAlign: 'right' },
   detailSetRowPR:  { backgroundColor: 'rgba(255,215,0,0.06)' },
+  detailPRCard:        { borderColor: '#FFD70033', backgroundColor: 'rgba(255,215,0,0.03)', marginBottom: 8 },
+  detailPRCardHeader:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  detailPRCardEmoji:   { fontSize: 14 },
+  detailPRCardTitle:   { color: C.gold, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' },
+  detailPRExRow:       { paddingVertical: 6 },
+  detailPRExRowBorder: { borderTopWidth: 1, borderTopColor: 'rgba(255,215,0,0.1)' },
+  detailPRExName:      { color: C.txt, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 },
   detailPRMedal: {
     width: 26, height: 26, borderRadius: 13,
     backgroundColor: '#FFD700',
@@ -2182,7 +2308,7 @@ const styles = StyleSheet.create({
   newBadge: {
     backgroundColor: `${RED}20`, borderRadius: 3, paddingHorizontal: 5, paddingVertical: 2,
   },
-  newBadgeText: { color: RED, fontSize: 7.5, fontWeight: '700', letterSpacing: 0.5 },
+  newBadgeText: { color: RED, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
   prExercise:  { color: C.txt, fontSize: 13, fontWeight: '700', flex: 1 },
   prDate:      { color: C.muted, fontSize: 9.5 },
   prOrm:       { color: C.sub, fontSize: 20, fontWeight: '800', lineHeight: 24 },
@@ -2229,7 +2355,7 @@ const styles = StyleSheet.create({
   mfMuscleRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
   mfMusclePct:     { fontSize: 22, fontWeight: '900', lineHeight: 26 },
   mfTopBadge:      { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
-  mfTopBadgeText:  { fontSize: 8, fontWeight: '800', letterSpacing: 0.5 },
+  mfTopBadgeText:  { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
   mfMuscleName:    { color: C.txt, fontSize: 12, fontWeight: '700', marginBottom: 6 },
   mfMiniTrack:     { height: 3, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, marginBottom: 5, overflow: 'hidden' },
   mfMiniFill:      { height: '100%', borderRadius: 2 },
@@ -2259,7 +2385,7 @@ const styles = StyleSheet.create({
     borderRadius: 16, padding: 20, marginBottom: 10,
   },
   dashBigNum: { fontSize: 48, fontWeight: '800', color: RED, lineHeight: 52 },
-  dashBigLbl: { fontSize: 8.5, color: C.sub, textTransform: 'uppercase', marginTop: 4 },
+  dashBigLbl: { fontSize: 10, color: C.sub, textTransform: 'uppercase', marginTop: 4 },
   dashGrid:   { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   dashGridVal:{ fontSize: 13, fontWeight: '700', color: C.sub },
   dashGridLbl:{ fontSize: 9, color: C.muted },
@@ -2268,7 +2394,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border,
     padding: 16, marginBottom: 10,
   },
-  dashCardTitle: { color: C.muted, fontSize: 8.5, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
+  dashCardTitle: { color: C.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
   dashRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
   dashRowBorder:{ borderBottomWidth: 1, borderBottomColor: C.border },
   dashRowLabel: { color: C.sub, fontSize: 12 },
@@ -2301,7 +2427,7 @@ const styles = StyleSheet.create({
   calCellTodayText:   { color: C.txt, fontWeight: '900' },
   calSummary:  { flexDirection: 'row', justifyContent: 'space-around', marginTop: 20 },
   calSumVal:   { fontSize: 20, fontWeight: '800', textAlign: 'center' },
-  calSumLbl:   { color: C.muted, fontSize: 8, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center', marginTop: 2 },
+  calSumLbl:   { color: C.muted, fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center', marginTop: 2 },
 
   // EditProfileModal
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.65)' },

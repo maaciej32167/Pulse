@@ -23,7 +23,7 @@ const { width: SW, height: SH } = Dimensions.get('window');
 const CONTAINER  = Math.min(SW * 0.92, 300);
 const HALF       = CONTAINER / 2;
 const RADIUS     = 110 * (CONTAINER / 300);
-const ITEM_SIZE  = 56;
+const ITEM_SIZE  = 64;
 const CENTER_SIZE = 68;
 const CENTER_R   = CENTER_SIZE / 2;
 const ITEM_BASE  = HALF - ITEM_SIZE / 2;
@@ -614,7 +614,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   itemLabel: {
-    fontSize: 7, fontWeight: '800', letterSpacing: 0.5,
+    fontSize: 9, fontWeight: '800', letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
 
@@ -638,7 +638,7 @@ const styles = StyleSheet.create({
   statUnit:    { fontSize: 16, color: C.cyan },
   statLabel:   { fontSize: 10, letterSpacing: 5, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', marginTop: 4 },
   statDivider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.08)' },
-  statPeriod:  { fontSize: 7, letterSpacing: 1.5, color: 'rgba(255,255,255,0.15)', textTransform: 'uppercase', marginTop: 2 },
+  statPeriod:  { fontSize: 9, letterSpacing: 1.5, color: 'rgba(255,255,255,0.15)', textTransform: 'uppercase', marginTop: 2 },
 
   // Hero
   heroWrap: { alignItems: 'center', justifyContent: 'center', zIndex: 200 },

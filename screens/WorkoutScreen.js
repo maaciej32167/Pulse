@@ -56,7 +56,7 @@ const PR_LABEL = {
 
 // ─── custom keypad ────────────────────────────────────────────────────────────
 
-const KEYS = [['7','8','9'],['4','5','6'],['1','2','3'],['.','0','⌫']];
+const KEYS = [['1','2','3'],['4','5','6'],['7','8','9'],['.','0','⌫']];
 
 function CustomKeypad({ showDot, onKey }) {
   return (
@@ -157,6 +157,7 @@ export default function WorkoutScreen({ navigation, route }) {
     const setter  = activeField === 'weight' ? setWeight : setReps;
     if (k === '⌫') { setter(current.slice(0, -1)); return; }
     if (k === '.' && (current.includes('.') || activeField === 'reps')) return;
+    if (k === '0' && current === '') return;
     if (current.length >= 6) return;
     setter(current + k);
   }
@@ -273,6 +274,7 @@ export default function WorkoutScreen({ navigation, route }) {
     let next;
     if (k === '⌫') next = current.slice(0, -1);
     else if (k === '.' && (current.includes('.') || !isW)) return;
+    else if (k === '0' && current === '') return;
     else if (current.length >= 6) return;
     else next = current + k;
     setEditingSet(prev => isW ? { ...prev, editWeight: next } : { ...prev, editReps: next });
@@ -636,7 +638,7 @@ const styles = StyleSheet.create({
   btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
   top2Card:      { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
-  top2Title:     { color: C.muted, fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
+  top2Title:     { color: C.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
   top2Row:       { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 },
   top2RowBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
   top2TrophyWrap: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
@@ -645,7 +647,7 @@ const styles = StyleSheet.create({
   top2X:         { color: C.muted, fontSize: 12 },
   top2Reps:      { color: C.txt, fontSize: 14, fontWeight: '600', marginRight: 4 },
   top2Orm:       { color: C.muted, fontSize: 10, flex: 1 },
-  top2Date:      { color: C.muted, fontSize: 9 },
+  top2Date:      { color: C.muted, fontSize: 10 },
 
   group:     { marginTop: 12 },
   groupName: { color: C.txt, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },

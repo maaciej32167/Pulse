@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
   },
   statItem:    { flex: 1, alignItems: 'center' },
   statVal:     { fontSize: 18, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  statLbl:     { fontSize: 8, color: C.muted2, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 2 },
+  statLbl:     { fontSize: 10, color: C.muted2, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 2 },
   statDivider: { width: 1, backgroundColor: C.border, marginVertical: 4 },
 
   // Overall bar
@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
     alignItems: 'center', backgroundColor: C.card,
   },
-  rarityChipLabel: { fontSize: 8, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  rarityChipLabel: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   rarityChipCount: { fontSize: 10, color: C.muted, marginTop: 1 },
 
   // Tabs
@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2, borderBottomColor: 'transparent',
   },
   tabActive:  { borderBottomColor: C.red },
-  tabText:    { fontSize: 9, fontWeight: '700', color: C.muted2, letterSpacing: 0.8 },
+  tabText:    { fontSize: 10, fontWeight: '700', color: C.muted2, letterSpacing: 0.8 },
 
   // Filter
   filterRow: {
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
   filterCount:       { fontSize: 10, color: C.muted2 },
   filterBtn:         { borderWidth: 1, borderColor: C.border2, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   filterBtnActive:   { borderColor: C.red + '66', backgroundColor: C.red + '18' },
-  filterBtnText:     { fontSize: 9, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  filterBtnText:     { fontSize: 10, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
 
   // Card
   card: {
@@ -509,18 +509,18 @@ const styles = StyleSheet.create({
   cardIcon:       { fontSize: 26, marginBottom: 8 },
   cardIconLocked: { opacity: 0.2 },
   cardName: {
-    fontSize: 11, fontWeight: '800', textTransform: 'uppercase',
+    fontSize: 12, fontWeight: '800', textTransform: 'uppercase',
     letterSpacing: 0.3, marginBottom: 4, minHeight: 30,
   },
-  cardDesc:    { fontSize: 10, color: C.muted, lineHeight: 14, marginBottom: 8, minHeight: 28 },
+  cardDesc:    { fontSize: 11, color: C.muted, lineHeight: 15, marginBottom: 8, minHeight: 28 },
   barWrap:     { marginBottom: 8 },
   barBg:       { height: 2, backgroundColor: C.border, borderRadius: 2, marginBottom: 3 },
   barFill:     { height: '100%', borderRadius: 2 },
-  barPct:      { fontSize: 8, fontWeight: '700', textAlign: 'right' },
+  barPct:      { fontSize: 9, fontWeight: '700', textAlign: 'right' },
   cardBottom:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   rarityBadge: { borderWidth: 1, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
-  rarityText:  { fontSize: 7, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
-  xpText:      { fontSize: 9 },
+  rarityText:  { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+  xpText:      { fontSize: 10 },
 
   // Modal
   modalOverlay: {
@@ -555,6 +555,6 @@ const styles = StyleSheet.create({
   modalStats:   { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
   modalStat:    { flex: 1, alignItems: 'center' },
   modalStatVal: { fontSize: 20, fontWeight: '800', marginBottom: 4 },
-  modalStatLabel: { fontSize: 8, color: C.muted2, textTransform: 'uppercase', letterSpacing: 1 },
+  modalStatLabel: { fontSize: 10, color: C.muted2, textTransform: 'uppercase', letterSpacing: 1 },
   modalStatDivider: { width: 1, height: 36, backgroundColor: C.border },
 });
