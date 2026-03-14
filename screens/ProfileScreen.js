@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList,
-  Modal, TextInput, LayoutAnimation, Platform, UIManager, Pressable,
+  Modal, TextInput, LayoutAnimation, Platform, UIManager, Pressable, Alert, Keyboard, KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import { Image } from 'react-native';
 
 import {
   loadRecords, loadBodyWeight, loadBWExercises, loadProfile, saveProfile, loadAchievements,
+  loadExercises, saveExercises, saveRecords, saveBWExercises,
 } from '../src/storage';
 import UserAvatar from '../components/UserAvatar';
 import { getCollectionStats } from '../src/achievements';
@@ -1536,11 +1537,13 @@ const CWICZ_SORT_BTNS = [
   { key: 'orm',    label: '1RM' },
 ];
 
-function CwiczeniaDetail({ exercise, records, bodyWeight, bwExercises, onBack, onChangeExercise }) {
+function CwiczeniaDetail({ exercise, records, bodyWeight, bwExercises, onBack, onChangeExercise, onRename, onDelete, onToggleBW }) {
   const isBW = bwExercises.has(exercise);
   const [sortKey, setSortKey] = useState('weight');
   const [sortDir, setSortDir] = useState('desc');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [renameInput, setRenameInput] = useState('');
 
   const allExercises = useMemo(() =>
     [...new Set(records.map(r => r.exercise).filter(Boolean))].sort(),
@@ -1639,22 +1642,97 @@ function CwiczeniaDetail({ exercise, records, bodyWeight, bwExercises, onBack, o
       val: bestSessionVolume ? `${Math.round(bestSessionVolume.vol)} kg` : '—', sub: bestSessionVolume?.date },
   ];
 
+  function confirmDelete() {
+    Alert.alert(
+      'Usuń ćwiczenie',
+      `Usunąć "${exercise}" z listy?\n\nRekordy w historii zostają.`,
+      [
+        { text: 'Anuluj', style: 'cancel' },
+        { text: 'Usuń', style: 'destructive', onPress: () => onDelete?.(exercise) },
+      ]
+    );
+  }
+
+  function handleRenameConfirm() {
+    Keyboard.dismiss();
+    const newName = renameInput.trim();
+    setEditing(false);
+    if (!newName || newName === exercise) return;
+    onRename?.(exercise, newName);
+  }
+
+  function handleRenameCancel() {
+    Keyboard.dismiss();
+    setEditing(false);
+  }
+
   return (
     <View style={{ flex: 1 }}>
+      {/* Modal zmiany nazwy — styl WorkoutScreen */}
+      <Modal visible={editing} transparent animationType="slide" onRequestClose={handleRenameCancel}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }} activeOpacity={1} onPress={handleRenameCancel} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.wkEditSheet}>
+            <View style={styles.wkEditHeader}>
+              <Text style={styles.wkEditTitle}>Zmień nazwę</Text>
+              <TouchableOpacity onPress={handleRenameCancel}>
+                <Text style={styles.wkEditClose}>Anuluj</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: 16 }}>
+              <Text style={styles.wkEditLabel}>NAZWA ĆWICZENIA</Text>
+              <TextInput
+                style={styles.wkEditInput}
+                value={renameInput}
+                onChangeText={setRenameInput}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={handleRenameConfirm}
+                placeholderTextColor={C.muted}
+                placeholder={exercise}
+              />
+              <TouchableOpacity style={styles.wkEditSaveBtn} onPress={handleRenameConfirm}>
+                <Text style={styles.wkEditSaveBtnText}>Zapisz zmiany</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       <ScrollView contentContainerStyle={styles.listPad} showsVerticalScrollIndicator={false}>
         <TouchableOpacity style={styles.detailBack} onPress={onBack} activeOpacity={0.7}>
           <Feather name="chevron-left" size={16} color={RED} />
           <Text style={styles.detailBackText}>Ćwiczenia</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.exPickerTrigger}
-          onPress={() => setPickerOpen(true)}
-          activeOpacity={0.75}
-        >
-          <Text style={[styles.detailDate, { flex: 1 }]} numberOfLines={1}>{exercise}</Text>
-          <Feather name="search" size={15} color={C.muted} />
-        </TouchableOpacity>
+        {/* Nagłówek ćwiczenia */}
+        <View style={styles.detailExHeader}>
+            <TouchableOpacity
+              style={[styles.exPickerTrigger, { flex: 1, marginRight: 8 }]}
+              onPress={() => setPickerOpen(true)}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.detailDate, { flex: 1 }]} numberOfLines={1}>{exercise}</Text>
+              <Feather name="search" size={15} color={C.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.detailActionBtn}
+              onPress={() => { setRenameInput(exercise); setEditing(true); }}
+              hitSlop={8}
+            >
+              <Feather name="edit-2" size={15} color={C.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.detailActionBtn, isBW && styles.detailActionBtnActive]}
+              onPress={() => onToggleBW?.(exercise)}
+              hitSlop={8}
+            >
+              <Text style={[styles.detailActionBtnText, isBW && { color: C.gold }]}>BW</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.detailActionBtn} onPress={confirmDelete} hitSlop={8}>
+              <Feather name="trash-2" size={15} color={RED} />
+            </TouchableOpacity>
+          </View>
 
         <ExPickerModal
           visible={pickerOpen}
@@ -1723,17 +1801,25 @@ function CwiczeniaDetail({ exercise, records, bodyWeight, bwExercises, onBack, o
   );
 }
 
-function CwiczeniaView({ records, bodyWeight, bwExercises }) {
-  const [period, setPeriod]       = useState(null);
-  const [selected, setSelected]   = useState(null);
-  const [sortDesc, setSortDesc]   = useState(true);
+function CwiczeniaView({ records, bodyWeight, onBWChange, onRecordsChange }) {
+  const [period, setPeriod]         = useState(null);
+  const [selected, setSelected]     = useState(null);
+  const [sortDesc, setSortDesc]     = useState(true);
   const [showPeriod, setShowPeriod] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [allExercises, setAllExercises] = useState([]);
+  const [localBW, setLocalBW]       = useState(new Set());
+  const [addModal, setAddModal]     = useState(false);
+  const [addInput, setAddInput]     = useState('');
 
-  const allExercises = useMemo(() =>
-    [...new Set(records.map(r => r.exercise).filter(Boolean))].sort(),
-    [records]
-  );
+  // Ładuj pełną listę ćwiczeń ze storage
+  useEffect(() => {
+    (async () => {
+      const [ex, bw] = await Promise.all([loadExercises(), loadBWExercises()]);
+      setAllExercises([...ex].sort((a, b) => a.localeCompare(b, 'pl', { sensitivity: 'base' })));
+      setLocalBW(bw);
+    })();
+  }, []);
 
   const cutoff = useMemo(() => {
     if (!period) return 0;
@@ -1745,8 +1831,8 @@ function CwiczeniaView({ records, bodyWeight, bwExercises }) {
     [records, cutoff, period]
   );
 
-  // Częstotliwość: unikalne dni treningowe per ćwiczenie
-  const exerciseStats = useMemo(() => {
+  // Stats z records per ćwiczenie (dla wyświetlenia częstotliwości)
+  const statsMap = useMemo(() => {
     const map = new Map();
     for (const r of filtered) {
       if (!r.exercise) continue;
@@ -1756,15 +1842,67 @@ function CwiczeniaView({ records, bodyWeight, bwExercises }) {
       if (day) entry.days.add(day);
       if ((r.timestamp || 0) > entry.last) entry.last = r.timestamp || 0;
     }
-    return Array.from(map.entries())
-      .map(([ex, { days, last }]) => ({ ex, count: days.size, last }));
+    return map;
   }, [filtered]);
 
-  const displayStats = useMemo(() =>
-    [...exerciseStats].sort((a, b) => sortDesc
-      ? (b.count - a.count || b.last - a.last)
-      : (a.count - b.count || a.last - b.last)),
-    [exerciseStats, sortDesc]);
+  // Lista WSZYSTKICH ćwiczeń ze statystykami (jeśli są)
+  const displayStats = useMemo(() => {
+    const list = allExercises.map(ex => {
+      const s = statsMap.get(ex);
+      return { ex, count: s?.days.size || 0, last: s?.last || 0 };
+    });
+    return [...list].sort((a, b) => sortDesc
+      ? (b.count - a.count || b.last - a.last || a.ex.localeCompare(b.ex, 'pl'))
+      : (a.count - b.count || a.last - b.last || a.ex.localeCompare(b.ex, 'pl')));
+  }, [allExercises, statsMap, sortDesc]);
+
+  // ── Dodaj ćwiczenie ──────────────────────────────────────────────────────────
+  async function handleAdd() {
+    const name = addInput.trim();
+    if (!name) return;
+    if (allExercises.includes(name)) {
+      Alert.alert('Już istnieje', `"${name}" jest już na liście.`);
+      return;
+    }
+    const updated = [...allExercises, name].sort((a, b) =>
+      a.localeCompare(b, 'pl', { sensitivity: 'base' })
+    );
+    setAllExercises(updated);
+    await saveExercises(updated);
+    setAddModal(false);
+    setAddInput('');
+  }
+
+  // ── Zmień nazwę (callback z CwiczeniaDetail) ─────────────────────────────────
+  async function handleRename(oldName, newName) {
+    await handleRenameExercise(oldName, newName);
+    setSelected(newName);
+  }
+
+  // ── Usuń ćwiczenie (callback z CwiczeniaDetail) ──────────────────────────────
+  async function handleDelete(name) {
+    const updated = allExercises.filter(e => e !== name);
+    setAllExercises(updated);
+    await saveExercises(updated);
+    if (localBW.has(name)) {
+      const newBW = new Set(localBW);
+      newBW.delete(name);
+      setLocalBW(newBW);
+      await saveBWExercises(newBW);
+      onBWChange?.(newBW);
+    }
+    setSelected(null);
+  }
+
+  // ── Toggle BW (callback z CwiczeniaDetail) ───────────────────────────────────
+  async function handleToggleBW(name) {
+    const newBW = new Set(localBW);
+    if (newBW.has(name)) newBW.delete(name);
+    else newBW.add(name);
+    setLocalBW(newBW);
+    await saveBWExercises(newBW);
+    onBWChange?.(newBW);
+  }
 
   if (selected) {
     return (
@@ -1772,16 +1910,19 @@ function CwiczeniaView({ records, bodyWeight, bwExercises }) {
         exercise={selected}
         records={records}
         bodyWeight={bodyWeight}
-        bwExercises={bwExercises}
+        bwExercises={localBW}
         onBack={() => setSelected(null)}
         onChangeExercise={ex => setSelected(ex)}
+        onRename={handleRename}
+        onDelete={handleDelete}
+        onToggleBW={handleToggleBW}
       />
     );
   }
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Toolbar: wyszukiwarka + okres + sortowanie */}
+      {/* Toolbar */}
       <View style={styles.cwiczToolRow}>
         <TouchableOpacity style={styles.cwiczSearchWrap} onPress={() => setPickerOpen(true)} activeOpacity={0.8}>
           <Feather name="search" size={13} color={C.muted} />
@@ -1822,36 +1963,69 @@ function CwiczeniaView({ records, bodyWeight, bwExercises }) {
         <TouchableOpacity style={styles.cwiczSortBtn} onPress={() => setSortDesc(d => !d)}>
           <Feather name={sortDesc ? 'arrow-down' : 'arrow-up'} size={14} color={RED} />
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.cwiczAddBtn}
+          onPress={() => { setAddInput(''); setAddModal(true); }}
+          activeOpacity={0.8}
+        >
+          <Feather name="plus" size={16} color={C.cyan} />
+        </TouchableOpacity>
       </View>
 
       {displayStats.length === 0 ? (
-        <View style={styles.empty}><Text style={styles.emptyText}>Brak danych</Text></View>
+        <View style={styles.empty}><Text style={styles.emptyText}>Brak ćwiczeń</Text></View>
       ) : (
         <FlatList
           data={displayStats}
           keyExtractor={item => item.ex}
           contentContainerStyle={styles.listPad}
-          renderItem={({ item, index }) => (
-            <TouchableOpacity
-              style={styles.cwiczRow}
-              onPress={() => setSelected(item.ex)}
-              activeOpacity={0.75}
-            >
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.cwiczRow} onPress={() => setSelected(item.ex)} activeOpacity={0.75}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.cwiczName} numberOfLines={1}>{item.ex}</Text>
-                <Text style={styles.cwiczSub}>
-                  {item.count} {item.count === 1 ? 'dzień' : item.count < 5 ? 'dni' : 'dni'}
-                  {item.last ? ` · ostatnio ${new Date(item.last).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}` : ''}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.cwiczName}>{item.ex}</Text>
+                  {localBW.has(item.ex) && <View style={styles.cwiczBWBadge}><Text style={styles.cwiczBWBadgeText}>BW</Text></View>}
+                </View>
+                {item.count > 0
+                  ? <Text style={styles.cwiczSub}>{item.count} {item.count === 1 ? 'dzień' : 'dni'}{item.last ? ` · ostatnio ${new Date(item.last).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}` : ''}</Text>
+                  : <Text style={styles.cwiczSub}>Brak historii</Text>
+                }
               </View>
               <View style={styles.cwiczFreqBadge}>
-                <Text style={styles.cwiczFreqNum}>{item.count}</Text>
+                {item.count > 0 && <Text style={styles.cwiczFreqNum}>{item.count}</Text>}
                 <Feather name="chevron-right" size={14} color={C.muted} />
               </View>
             </TouchableOpacity>
           )}
         />
       )}
+
+      {/* Modal dodaj ćwiczenie */}
+      <Modal visible={addModal} transparent animationType="slide" onRequestClose={() => setAddModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setAddModal(false)}>
+          <TouchableOpacity style={styles.modalSheet} activeOpacity={1}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Nowe ćwiczenie</Text>
+              <TouchableOpacity onPress={() => setAddModal(false)} hitSlop={12}>
+                <Feather name="x" size={18} color={C.muted} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.modalInput}
+              value={addInput}
+              onChangeText={setAddInput}
+              placeholder="np. Bench Press"
+              placeholderTextColor={C.muted}
+              autoFocus
+              onSubmitEditing={handleAdd}
+            />
+            <TouchableOpacity style={styles.modalSaveBtn} onPress={handleAdd}>
+              <Text style={styles.modalSaveBtnText}>Dodaj</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -1976,7 +2150,7 @@ const TABS = [
   { key: 'stats',    label: 'STATS' },
   { key: 'historia', label: 'HISTORIA' },
   { key: 'dash',     label: 'RAPORT' },
-  { key: 'cwicz',    label: 'ĆWICZ.' },
+  { key: 'cwicz',    label: 'ĆWICZENIA' },
 ];
 
 export default function ProfileScreen({ navigation }) {
@@ -2053,7 +2227,7 @@ export default function ProfileScreen({ navigation }) {
       {tab === 'stats'    && <StatsView    records={records} />}
       {tab === 'historia' && <HistoriaView records={records} bodyWeight={bodyWeight} bwExercises={bwExercises} />}
 {tab === 'dash'     && <MonthlyReportView records={records} />}
-      {tab === 'cwicz'    && <CwiczeniaView records={records} bodyWeight={bodyWeight} bwExercises={bwExercises} />}
+      {tab === 'cwicz'    && <CwiczeniaView records={records} bodyWeight={bodyWeight} bwExercises={bwExercises} onBWChange={setBwExercises} onRecordsChange={recs => setRecords([...recs].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)))} />}
     </SafeAreaView>
   );
 }
@@ -2520,5 +2694,24 @@ const styles = StyleSheet.create({
   cwiczDropItem:       { paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
   cwiczDropItemActive: { backgroundColor: RED + '12' },
   cwiczDropItemText:   { color: C.sub, fontSize: 13, fontWeight: '600' },
+
+  cwiczAddBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: C.cyan + '18', borderWidth: 1, borderColor: C.cyan + '40', alignItems: 'center', justifyContent: 'center' },
+  cwiczBWBadge: { backgroundColor: C.gold + '20', borderWidth: 1, borderColor: C.gold + '60', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+  cwiczBWBadgeText: { color: C.gold, fontSize: 9, fontWeight: '800' },
+
+  detailExHeader:       { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
+  detailActionBtn:      { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  detailActionBtnActive: { backgroundColor: C.gold + '15', borderColor: C.gold + '50' },
+  detailActionBtnText:  { color: C.muted, fontSize: 11, fontWeight: '800' },
+
+  wkEditOverlay:    { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
+  wkEditSheet:      { backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  wkEditHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
+  wkEditTitle:      { color: C.txt, fontSize: 16, fontWeight: '700' },
+  wkEditClose:      { color: RED, fontSize: 15 },
+  wkEditLabel:      { color: C.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+  wkEditInput:      { backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, color: C.txt, fontSize: 22, fontWeight: '700', marginBottom: 16 },
+  wkEditSaveBtn:    { backgroundColor: RED, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  wkEditSaveBtnText:{ color: '#fff', fontSize: 16, fontWeight: '700' },
 
 });

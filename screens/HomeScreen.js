@@ -37,10 +37,10 @@ const P = { IDLE: 0, OPEN: 1, HEARTBEAT: 2, EXPANDING: 3, CENTER: 4 };
 const MENU = [
   { id: 'plan',     label: 'PLAN',     icon: 'calendar',    color: '#00F5FF', angle: -150, screen: 'Plan'         },
   { id: 'workout',  label: 'TRENING',  icon: 'zap',         color: '#FF4757', angle:  -90, screen: 'Log'          },
-  { id: 'cwicz',    label: 'ĆWICZ.',   icon: 'bar-chart-2', color: '#00F5FF', angle:  -30, screen: 'Cwiczenia'    },
-  { id: 'discover', label: 'DISCOVER', icon: 'compass',     color: '#818cf8', angle:   30, screen: 'Discover'     },
-  { id: 'profile',  label: 'PROFIL',   icon: 'user',        color: '#FF4757', angle:   90, screen: 'Profil'       },
-  { id: 'achiev',   label: 'ACHIEV.',  icon: 'award',       color: '#fbbf24', angle:  150, screen: 'Achievements' },
+  { id: 'discover', label: 'ODKRYJ',   icon: 'compass',     color: '#818cf8', angle:  -30, screen: 'Discover'     },
+  { id: 'profile',  label: 'PROFIL',   icon: 'user',        color: '#FF4757', angle:   30, screen: 'Profil'       },
+  { id: 'achiev',   label: 'ACHIEV.',  icon: 'award',       color: '#fbbf24', angle:   90, screen: 'Achievements' },
+  { id: 'feed',     label: 'FEED',     icon: 'rss',         color: '#FF4757', angle:  150, screen: 'Feed'         },
 ];
 
 // Kolejność zgodna z ruchem wskazówek zegara (od 12):

@@ -3,9 +3,11 @@
 ## Ostatnie aktualizacje
 
 > **Aktualizuj tę sekcję po każdym `git commit` / `git push`** — krótki opis co zostało zmienione.
+> **Po `git push` zaktualizuj również dev log w Obsidianie:** `/Users/maciejgierlik/Documents/Obsidian/Pulse/Dev log/2026-03.md`
 
 | Data | Commit | Zmiany |
 |---|---|---|
+| 14.03.2026 | `d5af5d5` | Czcionki min 9px, Historia PR chipy, Raport kafelki/wykresy, klawiatura telefon, spójność liczenia treningów |
 | 09.03.2026 | `40d7934` | Tygodnie Pn–Nd w stats i raporcie, domyślna metryka = CZAS, kafelki podsumowania kompaktowe |
 | 09.03.2026 | `c80e0e5` | Workout: brak domyślnego ćwiczenia, top 2 rekordy ze złotym/srebrnym trofeum |
 | 09.03.2026 | `680f502` | Raport: picker miesiąc/rok, tryb roczny, donut chart partii mięśniowych |
@@ -377,55 +379,300 @@ const C = {
 
 ---
 
-## Backend — co to znaczy dla Pulse
+## Backend — plan wdrożenia
 
-### Obecny stan
-Aplikacja działa **tylko lokalnie** — dane są w AsyncStorage na telefonie. Nikt inny nie widzi Twoich treningów, Ty nie widzisz cudzych.
+**Stack: Supabase** (PostgreSQL + Auth + Realtime + Storage). Decyzja podjęta.
+Darmowy tier wystarczy na MVP. Projekt założyć na supabase.com → "pulse-app".
 
-### Co daje backend
-Serwer w internecie który:
-- przechowuje dane wszystkich użytkowników w bazie danych
-- pozwala się logować (email / Apple ID / Google)
-- synchronizuje dane między urządzeniami
-- umożliwia komunikację między użytkownikami (feed, rankingi, rywal)
+---
 
-### Co konkretnie trzeba zbudować
+### Co jest już gotowe w lokalnej strukturze
 
-| Element | Opis |
+| Element | Status |
 |---|---|
-| **Autentykacja** | Rejestracja i logowanie — bez tego nie ma kont, nie ma social |
-| **Baza danych** | Rekordy, profile, siłownie na serwerze — proponowany stack: **Supabase** (PostgreSQL + auth, darmowy tier) |
-| **Synchronizacja** | AsyncStorage → upload na serwer po każdym treningu. Offline działa, sync gdy internet |
-| **Social API** | Feed znajomych, rankingi siłowni, rywal algorytmiczny |
-| **Sesje treningowe (live)** | Realtime "Teraz tutaj" w GymScreen — patrz niżej |
+| UUID dla wszystkich rekordów | ✅ `generateUUID()` w storage.js |
+| `workoutId` grupujący serie | ✅ |
+| `gymName` w rekordach | ✅ (denormalizacja offline) |
+| `isoDate` (ISO 8601) | ✅ |
+| `prTypes[]` tablica typów PR | ✅ |
+| `is_public` toggle w SummaryScreen | ✅ |
+| `userId: null` placeholder w profilu | ✅ |
 
-### Sesje treningowe — flow z backendem
+### Czego brakuje — do zbudowania
 
+| Element | Plik docelowy | Uwagi |
+|---|---|---|
+| Klient Supabase | `src/supabase.js` | URL + anon key z dashboardu |
+| Zmienne środowiskowe | `.env` + `app.config.js` | Nigdy nie hardkoduj kluczy |
+| AuthScreen (UI logowania) | `screens/AuthScreen.js` | Email + hasło, Apple Sign In |
+| Logika auth | `src/auth.js` | signUp, signIn, signOut |
+| Sync po treningu | `src/sync.js` | Fire & forget w SummaryScreen |
+| Migracja historii | `src/sync.js` | Jednorazowo przy pierwszym logowaniu |
+| Deep link (potwierdzenie email) | `app.json` → `scheme: "pulse"` | Wymagane przez Supabase auth |
+| Storage avatarów/zdjęć | Supabase Storage bucket | `avatars/`, `workout-photos/` |
+| Push notifications | `src/notifications.js` | Expo + Supabase Edge Function |
+| Tabela `gyms` z UUID | SQL + migracja | Teraz gymName to string — docelowo foreign key |
+| Sync achievementów | `src/sync.js` | Tabela `achievements` w Supabase |
+| Rankingi (SQL view) | Supabase SQL Editor | `gym_weekly_rank` view |
+| System znajomych | `src/feed.js` | Tabela `follows` |
+
+---
+
+### Schema bazy danych (wykonać w Supabase SQL Editor)
+
+```sql
+-- Profile użytkowników
+create table public.profiles (
+  id          uuid references auth.users primary key,
+  username    text unique,
+  name        text,
+  bio         text,
+  avatar_url  text,
+  birth_date  date,
+  created_at  timestamptz default now()
+);
+
+-- Siłownie
+create table public.gyms (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,
+  city       text,
+  lat        float,
+  lng        float,
+  created_at timestamptz default now()
+);
+
+-- Treningi (sesje)
+create table public.workouts (
+  id          uuid primary key,
+  user_id     uuid references profiles,
+  gym_id      uuid references gyms,
+  gym_name    text,
+  started_at  timestamptz,
+  ended_at    timestamptz,
+  title       text,
+  note        text,
+  is_public   boolean default true,
+  created_at  timestamptz default now()
+);
+
+-- Serie
+create table public.records (
+  id           uuid primary key,
+  workout_id   uuid references workouts,
+  user_id      uuid references profiles,
+  exercise     text not null,
+  weight       float,
+  reps         int,
+  is_pr        boolean default false,
+  pr_types     text[],
+  iso_date     text,
+  timestamp_ms bigint,
+  created_at   timestamptz default now()
+);
+
+-- Ćwiczenia
+create table public.exercises (
+  id         uuid primary key,
+  user_id    uuid references profiles,
+  name       text not null,
+  is_bw      boolean default false,
+  created_at timestamptz default now()
+);
+
+-- Waga ciała
+create table public.body_weights (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid references profiles,
+  weight_kg   float,
+  measured_at timestamptz default now()
+);
+
+-- Znajomi
+create table public.follows (
+  follower_id  uuid references profiles,
+  following_id uuid references profiles,
+  created_at   timestamptz default now(),
+  primary key (follower_id, following_id)
+);
+
+-- Ranking siłowni (view)
+create view gym_weekly_rank as
+select
+  w.gym_name,
+  w.user_id,
+  p.name,
+  p.avatar_url,
+  sum(r.weight * r.reps) as volume,
+  rank() over (
+    partition by w.gym_name
+    order by sum(r.weight * r.reps) desc
+  ) as rank
+from workouts w
+join records r on r.workout_id = w.id
+join profiles p on p.id = w.user_id
+where w.started_at >= date_trunc('week', now())
+group by w.gym_name, w.user_id, p.name, p.avatar_url;
 ```
-LogScreen → wybór siłowni
-  ↓
-WorkoutScreen start → POST /sessions { gymId, userId, startedAt }
-  ↓
-WorkoutScreen → PATCH /sessions/:id { currentExercise }
-  (przy każdej zmianie ćwiczenia)
-  ↓
-GymScreen → GET /gyms/:id/live  (polling ~30s lub WebSocket)
-  → zwraca aktywne sesje → sekcja "Teraz tutaj" z migającą kropką
-  ↓
-SummaryScreen (zakończenie) → PATCH /sessions/:id { endedAt }
-  → sesja znika z "Teraz tutaj"
-  → wolumen/czas/ćwiczenia trafiają do statystyk siłowni
+
+**Row Level Security** — uruchomić po każdej tabeli:
+
+```sql
+alter table profiles     enable row level security;
+alter table workouts     enable row level security;
+alter table records      enable row level security;
+alter table exercises    enable row level security;
+alter table body_weights enable row level security;
+alter table follows      enable row level security;
+
+-- Przykładowe polityki:
+create policy "profiles_select" on profiles for select using (true);
+create policy "profiles_update" on profiles for update using (auth.uid() = id);
+create policy "workouts_select" on workouts for select
+  using (is_public = true or auth.uid() = user_id);
+create policy "workouts_insert" on workouts for insert with check (auth.uid() = user_id);
+create policy "records_own"    on records for all using (auth.uid() = user_id);
+create policy "exercises_own"  on exercises for all using (auth.uid() = user_id);
+create policy "body_weights_own" on body_weights for all using (auth.uid() = user_id);
+create policy "follows_select" on follows for select using (true);
+create policy "follows_insert" on follows for insert with check (auth.uid() = follower_id);
+create policy "follows_delete" on follows for delete using (auth.uid() = follower_id);
 ```
 
-**Struktura danych jest już gotowa** — rekordy mają `gymId`, `gymName`, `workoutId`. Brakuje tylko encji sesji po stronie backendu.
+---
 
-### Decyzje do podjęcia przed budową
-- Supabase vs Firebase vs własny serwer?
-- Czy najpierw MVP bez backendu (tylko local) i publikacja w App Store?
-- Czy szukać współpracownika backendowego?
+### Kolejność wdrożenia — fazy
 
-### Ważne
-To największy skok w projekcie — tygodnie pracy, nie dni. Obecna struktura danych (`src/storage.js`, UUID, isoDate) jest już przygotowana pod migrację do backendu.
+#### Faza 1 — Auth + sync (7 dni, solo)
+
+| # | Zadanie | Plik | Uwagi |
+|---|---|---|---|
+| 1 | Supabase projekt + SQL schema + RLS | — | Jednorazowo w dashboardzie |
+| 2 | `.env` + `app.config.js` | root | `SUPABASE_URL`, `SUPABASE_ANON_KEY` |
+| 3 | `src/supabase.js` | nowy | Klient + SecureStore adapter |
+| 4 | `src/auth.js` | nowy | signUp, signIn, signOut, getUser |
+| 5 | `screens/AuthScreen.js` | nowy | UI: email/hasło + Apple Sign In |
+| 6 | `App.js` | edycja | Wrap nawigacji logiką sesji auth |
+| 7 | `app.json` | edycja | Dodać `scheme: "pulse"` (deep link email) |
+| 8 | `src/sync.js` | nowy | syncWorkout() + syncAllHistorical() |
+| 9 | `screens/SummaryScreen.js` | edycja | Wywołaj syncWorkout() po zapisaniu |
+| 10 | Ekran onboarding sync | jednorazowy modal | syncAllHistorical() przy pierwszym logowaniu |
+
+#### Faza 2 — Feed + znajomi (5 dni)
+
+| # | Zadanie | Plik |
+|---|---|---|
+| 11 | `src/feed.js` | nowy — loadFriendsFeed, loadGymFeed, loadLiveAtGym |
+| 12 | FeedScreen — podmiana mocków | edycja |
+| 13 | Realtime TERAZ TUTAJ | FeedScreen — supabase.channel() |
+| 14 | System follow/unfollow | DiscoverScreen |
+| 15 | Publiczny profil z danymi real | PublicProfileScreen |
+
+#### Faza 3 — Rankingi + powiadomienia (5 dni)
+
+| # | Zadanie | Uwagi |
+|---|---|---|
+| 16 | Ranking siłowni z widoku SQL | gym_weekly_rank |
+| 17 | Expo Push Notifications setup | `src/notifications.js` |
+| 18 | Supabase Edge Function → trigger | Wysyła push przy nowym PR znajomego |
+| 19 | Zdjęcia treningów | Supabase Storage bucket `workout-photos/` |
+| 20 | Avatary użytkowników | Supabase Storage bucket `avatars/` |
+
+---
+
+### Kluczowe pliki do napisania
+
+**`src/supabase.js`** — klient z SecureStore:
+```js
+import { createClient } from '@supabase/supabase-js';
+import * as SecureStore from 'expo-secure-store';
+
+const ExpoSecureStoreAdapter = {
+  getItem:    (key) => SecureStore.getItemAsync(key),
+  setItem:    (key, value) => SecureStore.setItemAsync(key, value),
+  removeItem: (key) => SecureStore.deleteItemAsync(key),
+};
+
+export const supabase = createClient(
+  process.env.EXPO_PUBLIC_SUPABASE_URL,
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+  { auth: { storage: ExpoSecureStoreAdapter, autoRefreshToken: true,
+            persistSession: true, detectSessionInUrl: false } }
+);
+```
+
+**`src/sync.js`** — sync po treningu (fire & forget):
+```js
+export async function syncWorkout(workoutId) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;  // offline — pomijamy
+
+  const allRecords = await loadRecords();
+  const wRecords   = allRecords.filter(r => r.workoutId === workoutId);
+  const first      = wRecords[0];
+
+  await supabase.from('workouts').upsert({
+    id: workoutId, user_id: user.id,
+    gym_name: first.gymName || null,
+    started_at: first.timestamp ? new Date(first.timestamp).toISOString() : null,
+    is_public: true,
+  });
+
+  await supabase.from('records').upsert(
+    wRecords.map(r => ({
+      id: r.id, workout_id: workoutId, user_id: user.id,
+      exercise: r.exercise, weight: Number(r.weight), reps: Number(r.reps),
+      is_pr: r.isPR || false, pr_types: r.prTypes || [],
+      iso_date: r.isoDate || null, timestamp_ms: r.timestamp || null,
+    }))
+  );
+}
+```
+
+**W `SummaryScreen.js`** — po `await saveRecords(...)`:
+```js
+import { syncWorkout } from '../src/sync';
+syncWorkout(workoutId).catch(console.warn);  // fire & forget, nie blokuje UI
+```
+
+**W `App.js`** — obsługa sesji:
+```js
+const [session, setSession] = useState(null);
+const [authLoading, setAuthLoading] = useState(true);
+
+useEffect(() => {
+  supabase.auth.getSession().then(({ data }) => {
+    setSession(data.session);
+    setAuthLoading(false);
+  });
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+  return () => subscription.unsubscribe();
+}, []);
+
+// W JSX: if (!session) return <AuthScreen />;
+```
+
+---
+
+### Zasady których pilnować
+
+1. **Zawsze `upsert`, nigdy `insert`** — sync może być wywołany wielokrotnie
+2. **Offline-first** — `syncWorkout()` to fire & forget; aplikacja działa bez internetu
+3. **Nie usuwać AsyncStorage** — zostaje jako lokalny cache, Supabase to mirror
+4. **RLS zawsze włączone** — nigdy nie wyłączaj nawet na testy
+5. **Klucze w `.env`** — `EXPO_PUBLIC_SUPABASE_URL` i `EXPO_PUBLIC_SUPABASE_ANON_KEY`, nigdy hardkodowane
+6. **`app.json` scheme** — bez `scheme: "pulse"` potwierdzenie emaila nie działa na urządzeniu
+
+---
+
+### Instalacja zależności (gdy zaczynamy)
+
+```bash
+cd /Users/maciejgierlik/Documents/Aplikacje/Pulse
+npx expo install @supabase/supabase-js
+npx expo install expo-secure-store
+npx expo install expo-notifications  # Faza 3
+```
 
 ---
 

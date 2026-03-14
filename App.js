@@ -26,6 +26,8 @@ import WorkoutDetailScreen   from './screens/WorkoutDetailScreen';
 import AchievementsScreen    from './screens/AchievementsScreen';
 import SettingsScreen        from './screens/SettingsScreen';
 import TileSettingsScreen    from './screens/TileSettingsScreen';
+import FeedScreen            from './screens/FeedScreen';
+import PublicProfileScreen   from './screens/PublicProfileScreen';
 
 const Stack = createNativeStackNavigator();
 export const navigationRef = createNavigationContainerRef();
@@ -161,6 +163,8 @@ export default function App() {
           <Stack.Screen name="Achievements"   component={AchievementsScreen}   />
           <Stack.Screen name="Settings"       component={SettingsScreen}        />
           <Stack.Screen name="TileSettings"   component={TileSettingsScreen}    />
+          <Stack.Screen name="Feed"           component={FeedScreen}            />
+          <Stack.Screen name="PublicProfile"  component={PublicProfileScreen}   />
         </Stack.Navigator>
         <ActiveWorkoutBanner />
       </NavigationContainer>
